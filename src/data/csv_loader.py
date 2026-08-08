@@ -4,10 +4,17 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+from typing import Iterator, Protocol
 
 from ..errors import DataValidationError, ErrorCode
 from .normalization import normalize_headers
-from .validation import LoadedDataset, ValidationReport, validate_rows
+from .validation import LoadedDataset, ValidationReport, _NumberedRow, validate_rows
+
+
+class _LineNumberedReader(Protocol):
+    line_num: int
+
+    def __next__(self) -> list[str]: ...
 
 
 def load_csv(path: str | Path) -> LoadedDataset:
@@ -25,7 +32,11 @@ def load_csv(path: str | Path) -> LoadedDataset:
             try:
                 headers = next(reader, None)
                 header_map = normalize_headers(headers or [], source=source)
-                validated = validate_rows(reader, header_map, source=source)
+                validated = validate_rows(
+                    _numbered_rows(reader),
+                    header_map,
+                    source=source,
+                )
             except csv.Error as exc:
                 raise DataValidationError(
                     ErrorCode.MALFORMED_CSV,
@@ -74,3 +85,14 @@ def _safe_source_label(path: Path) -> str:
     if path.is_absolute():
         return path.name or "<input>"
     return str(path)
+
+
+def _numbered_rows(reader: _LineNumberedReader) -> Iterator[_NumberedRow]:
+    """Yield CSV records with the physical line where each record begins."""
+    while True:
+        source_row = reader.line_num + 1
+        try:
+            row = next(reader)
+        except StopIteration:
+            return
+        yield _NumberedRow(tuple(row), source_row)

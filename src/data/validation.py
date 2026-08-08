@@ -14,6 +14,14 @@ from .normalization import HeaderMap
 
 
 @dataclass(frozen=True, slots=True)
+class _NumberedRow:
+    """One CSV logical record paired with its physical starting line."""
+
+    values: tuple[str, ...]
+    source_row: int
+
+
+@dataclass(frozen=True, slots=True)
 class ValidatedRows:
     """Validated row output before the dataset-level report is assembled."""
 
@@ -218,13 +226,13 @@ def timestamp_is_aware(value: datetime) -> bool:
 
 
 def validate_rows(
-    rows: Iterable[Sequence[str]],
+    rows: Iterable[Sequence[str] | _NumberedRow],
     header_map: HeaderMap,
     *,
     source: str,
     first_data_row: int = 2,
 ) -> ValidatedRows:
-    """Validate ordered CSV rows and construct immutable internal bars."""
+    """Validate ordered rows and construct immutable internal bars."""
     bars: list[Bar] = []
     symbol: str | None = None
     previous_timestamp: datetime | None = None
@@ -232,8 +240,13 @@ def validate_rows(
     expected_width = len(header_map.columns)
     awareness_mode: bool | None = None
 
-    for offset, row in enumerate(rows):
-        source_row = first_data_row + offset
+    for offset, raw_row in enumerate(rows):
+        if isinstance(raw_row, _NumberedRow):
+            row = raw_row.values
+            source_row = raw_row.source_row
+        else:
+            row = raw_row
+            source_row = first_data_row + offset
         if len(row) != expected_width:
             raise DataValidationError(
                 ErrorCode.MALFORMED_ROW,
