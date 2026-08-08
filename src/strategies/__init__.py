@@ -4,6 +4,7 @@ from .base import Strategy, StrategyFactory, is_strategy, require_strategy, vali
 from .context import StrategyContext, freeze_parameters
 from .adapter import StrategyAdapter, run_strategy
 from .registry import BUILTIN_REGISTRY, StrategyDescriptor, StrategyRegistry, register
+from .loader import load_custom_strategy, load_strategy, resolve_import_path
 
 __all__ = [
     "Strategy",
@@ -19,4 +20,7 @@ __all__ = [
     "StrategyDescriptor",
     "StrategyRegistry",
     "register",
+    "load_custom_strategy",
+    "load_strategy",
+    "resolve_import_path",
 ]
