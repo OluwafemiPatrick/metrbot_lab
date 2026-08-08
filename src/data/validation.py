@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 from ..domain import Bar
+from ..domain.base import SerializableRecord, require_datetime, require_text
 from ..errors import DataValidationError, DomainValidationError, ErrorCode
 from .normalization import HeaderMap
 
@@ -19,6 +20,89 @@ class ValidatedRows:
     bars: tuple[Bar, ...]
     symbol: str | None
     volume_present: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationReport(SerializableRecord):
+    """Immutable summary of a successfully validated input dataset."""
+
+    source_path: str
+    row_count: int
+    first_timestamp: datetime
+    last_timestamp: datetime
+    symbol: str | None
+    volume_present: bool
+    columns: tuple[str, ...]
+    extra_columns: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        require_text(self.source_path, "source_path")
+        if not isinstance(self.row_count, int) or isinstance(self.row_count, bool) or self.row_count < 1:
+            raise DomainValidationError(
+                ErrorCode.INVALID_VALUE,
+                "row_count must be a positive integer",
+                field="row_count",
+            )
+        require_datetime(self.first_timestamp, "first_timestamp")
+        require_datetime(self.last_timestamp, "last_timestamp")
+        if self.last_timestamp < self.first_timestamp:
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "last_timestamp must not precede first_timestamp",
+                field="last_timestamp",
+            )
+        if self.symbol is not None:
+            require_text(self.symbol, "symbol")
+        if not isinstance(self.volume_present, bool):
+            raise DomainValidationError(
+                ErrorCode.INVALID_VALUE,
+                "volume_present must be a boolean",
+                field="volume_present",
+            )
+        _require_string_tuple(self.columns, "columns")
+        _require_string_tuple(self.extra_columns, "extra_columns")
+        _require_string_tuple(self.warnings, "warnings", allow_empty=True)
+
+
+@dataclass(frozen=True, slots=True)
+class LoadedDataset(SerializableRecord):
+    """Validated bars and their source summary."""
+
+    bars: tuple[Bar, ...]
+    report: ValidationReport
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.bars, tuple) or not self.bars or not all(isinstance(bar, Bar) for bar in self.bars):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "bars must be a non-empty tuple of Bar records",
+                field="bars",
+            )
+        if not isinstance(self.report, ValidationReport):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "report must be a ValidationReport",
+                field="report",
+            )
+        if len(self.bars) != self.report.row_count:
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "report row_count must match bars",
+                field="row_count",
+            )
+        if self.bars[0].timestamp != self.report.first_timestamp:
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "report first_timestamp must match bars",
+                field="first_timestamp",
+            )
+        if self.bars[-1].timestamp != self.report.last_timestamp:
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "report last_timestamp must match bars",
+                field="last_timestamp",
+            )
 
 
 def parse_timestamp(raw: str, *, source: str, row: int, column: str = "Timestamp") -> datetime:
@@ -240,6 +324,17 @@ def validate_rows(
         raise DataValidationError(ErrorCode.EMPTY_DATASET, "CSV contains a header but no data rows", source=source)
 
     return ValidatedRows(tuple(bars), symbol, header_map.has("Volume"))
+
+
+def _require_string_tuple(value: tuple[str, ...], field: str, *, allow_empty: bool = False) -> None:
+    if not isinstance(value, tuple) or (not allow_empty and not value) or not all(
+        isinstance(item, str) and item.strip() for item in value
+    ):
+        raise DomainValidationError(
+            ErrorCode.INVALID_VALUE,
+            "must be a tuple of non-empty strings",
+            field=field,
+        )
 
 
 def _require_text(
