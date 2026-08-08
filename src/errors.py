@@ -54,6 +54,7 @@ class ErrorCode(StrEnum):
     INVALID_STRATEGY_CONTEXT = "INVALID_STRATEGY_CONTEXT"
     STRATEGY_EXECUTION_FAILED = "STRATEGY_EXECUTION_FAILED"
     RUN_FINGERPRINT_ERROR = "RUN_FINGERPRINT_ERROR"
+    REPORTING_ERROR = "REPORTING_ERROR"
 
 
 class MetrbotLabError(Exception):
@@ -144,3 +145,7 @@ class StrategyExecutionError(StrategyError):
 
 class RunIdentityError(MetrbotLabError):
     """Raised when reproducible run identity cannot be prepared safely."""
+
+
+class ReportingError(MetrbotLabError):
+    """Raised when a completed run cannot be converted into a safe report."""
