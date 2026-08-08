@@ -53,6 +53,7 @@ class ErrorCode(StrEnum):
     INVALID_STRATEGY_PARAMETERS = "INVALID_STRATEGY_PARAMETERS"
     INVALID_STRATEGY_CONTEXT = "INVALID_STRATEGY_CONTEXT"
     STRATEGY_EXECUTION_FAILED = "STRATEGY_EXECUTION_FAILED"
+    RUN_FINGERPRINT_ERROR = "RUN_FINGERPRINT_ERROR"
 
 
 class MetrbotLabError(Exception):
@@ -139,3 +140,7 @@ class StrategyValidationError(StrategyError):
 
 class StrategyExecutionError(StrategyError):
     """Raised when a strategy callback fails during an execution session."""
+
+
+class RunIdentityError(MetrbotLabError):
+    """Raised when reproducible run identity cannot be prepared safely."""
