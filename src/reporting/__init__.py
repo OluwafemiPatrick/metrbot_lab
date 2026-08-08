@@ -2,5 +2,6 @@
 
 from .contracts import ArtifactBundle, MetricReport, validate_report_input
 from .metrics import calculate_metrics
+from .artifacts import write_artifacts
 
-__all__ = ["ArtifactBundle", "MetricReport", "calculate_metrics", "validate_report_input"]
+__all__ = ["ArtifactBundle", "MetricReport", "calculate_metrics", "validate_report_input", "write_artifacts"]

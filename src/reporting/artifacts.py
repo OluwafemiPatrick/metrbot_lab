@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Mapping
+from datetime import timezone
 from io import StringIO
 import json
 import math
+import os
 from pathlib import Path
+import shutil
+import tempfile
 from typing import Final
 
 from ..domain.base import to_json_compatible
 from ..domain.results import RunResult, Trade
 from ..errors import ErrorCode, ReportingError
-from .contracts import MetricReport, validate_report_input
+from .contracts import ArtifactBundle, MetricReport, validate_report_input
 
 
 ARTIFACT_SCHEMA_VERSION: Final[int] = 1
@@ -59,6 +63,7 @@ _SENSITIVE_KEY_MARKERS: Final[tuple[str, ...]] = (
     "access_key",
     "private_key",
 )
+_ARTIFACT_NAMES: Final[frozenset[str]] = frozenset({"summary.json", "trades.csv", "equity.csv"})
 
 
 def build_summary_payload(result: RunResult, metrics: MetricReport) -> dict[str, object]:
@@ -164,6 +169,106 @@ def serialize_equity_csv(result: RunResult) -> str:
             }
         )
     return output.getvalue()
+
+
+def write_artifacts(
+    result: RunResult,
+    metrics: MetricReport,
+    output_root: str | Path = "backtests",
+) -> ArtifactBundle:
+    """Publish exactly three report files, or leave no successful report behind."""
+    validate_report_input(result)
+    if not isinstance(metrics, MetricReport):
+        raise ReportingError(ErrorCode.REPORTING_ERROR, "artifact writing requires a MetricReport", field="metrics")
+    root = Path(output_root)
+    staging: Path | None = None
+    destination: Path | None = None
+    published = False
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        destination = _next_destination(root, result)
+        staging = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=root))
+        contents = {
+            "summary.json": serialize_summary_json(result, metrics),
+            "trades.csv": serialize_trades_csv(result),
+            "equity.csv": serialize_equity_csv(result),
+        }
+        for filename, content in contents.items():
+            _write_atomic_text(staging / filename, content)
+        if {path.name for path in staging.iterdir()} != _ARTIFACT_NAMES:
+            raise ReportingError(
+                ErrorCode.REPORTING_ERROR,
+                "staging directory does not contain exactly three report files",
+                field="artifacts",
+            )
+        os.replace(staging, destination)
+        staging = None
+        published = True
+        if {path.name for path in destination.iterdir()} != _ARTIFACT_NAMES:
+            raise ReportingError(
+                ErrorCode.REPORTING_ERROR,
+                "published directory does not contain exactly three report files",
+                field="artifacts",
+            )
+        return ArtifactBundle(
+            destination,
+            destination / "summary.json",
+            destination / "trades.csv",
+            destination / "equity.csv",
+        )
+    except ReportingError:
+        if published and destination is not None:
+            shutil.rmtree(destination, ignore_errors=True)
+        raise
+    except (OSError, TypeError, ValueError) as exc:
+        if published and destination is not None:
+            shutil.rmtree(destination, ignore_errors=True)
+        raise ReportingError(
+            ErrorCode.REPORTING_ERROR,
+            "report artifacts could not be published",
+            field="artifacts",
+        ) from exc
+    finally:
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
+
+
+def _next_destination(root: Path, result: RunResult) -> Path:
+    created_at = result.metadata.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    else:
+        created_at = created_at.astimezone(timezone.utc)
+    short_id = result.metadata.run_id.removeprefix("run-")[:12] or "run"
+    base = f"{created_at:%Y%m%d-%H%M%S}-{short_id}"
+    candidate = root / base
+    suffix = 1
+    while candidate.exists():
+        candidate = root / f"{base}-{suffix:02d}"
+        suffix += 1
+    return candidate
+
+
+def _write_atomic_text(path: Path, content: str) -> None:
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=path.parent,
+            prefix=f".{path.name}-",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def _trade_row(trade: Trade) -> dict[str, str]:
