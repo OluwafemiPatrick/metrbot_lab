@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import importlib
+from pathlib import Path
+import sys
 
 from ..errors import ErrorCode, StrategyValidationError
 from .base import Strategy, require_strategy
@@ -13,6 +15,7 @@ from .registry import BUILTIN_REGISTRY, StrategyRegistry
 
 def resolve_import_path(reference: str) -> object:
     """Resolve one trusted ``module.path:ClassName`` reference without registration."""
+    ensure_current_directory_importable()
     module_name, symbol_name = _split_import_path(reference)
     try:
         module = importlib.import_module(module_name)
@@ -37,6 +40,19 @@ def resolve_import_path(reference: str) -> object:
             field="strategy",
         )
     return candidate
+
+
+def ensure_current_directory_importable() -> None:
+    """Make checkout-local trusted strategy modules visible to console scripts.
+
+    Python launched through an installed console script places the script's
+    directory first on ``sys.path`` rather than the user's working directory.
+    The MVP explicitly trusts user-supplied strategy modules, so add the
+    current directory for the duration of this process before resolving one.
+    """
+    current_directory = str(Path.cwd())
+    if current_directory not in sys.path:
+        sys.path.insert(0, current_directory)
 
 
 def load_custom_strategy(reference: str, parameters: Mapping[str, object] | None = None) -> Strategy:

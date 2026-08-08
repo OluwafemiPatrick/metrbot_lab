@@ -14,6 +14,7 @@ from ..config import effective_configuration
 from ..domain.account import RunConfig, freeze_configuration_mapping
 from ..domain.base import SerializableRecord, to_json_compatible
 from ..errors import ErrorCode, RunIdentityError
+from ..strategies.loader import ensure_current_directory_importable
 from ..version import __version__
 
 
@@ -151,6 +152,7 @@ def _hash_file(path: str | Path, *, field: str) -> str:
 def _hash_custom_strategy_source(reference: str) -> str | None:
     if ":" not in reference:
         return None
+    ensure_current_directory_importable()
     module_name, _symbol_name = reference.split(":", 1)
     if not module_name.strip():
         raise RunIdentityError(
