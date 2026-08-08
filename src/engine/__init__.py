@@ -2,6 +2,7 @@
 
 from .identity import RunIdentity, build_run_identity, canonical_json, canonical_result_payload
 from .runner import BacktestRunner
+from .terminal import format_terminal_summary
 
 __all__ = [
     "RunIdentity",
@@ -9,4 +10,5 @@ __all__ = [
     "build_run_identity",
     "canonical_json",
     "canonical_result_payload",
+    "format_terminal_summary",
 ]

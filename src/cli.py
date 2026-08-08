@@ -84,7 +84,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "backtest":
         try:
             config = _resolve_backtest_config(args)
-            from .engine import BacktestRunner
+            from .engine import BacktestRunner, format_terminal_summary
 
             result = BacktestRunner().run(config)
         except (
@@ -104,7 +104,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if result.status != "SUCCESS":  # pragma: no cover - RunResult currently only returns completed success
             print("[INTERNAL_ERROR] backtest did not complete successfully", file=sys.stderr)
             return INTERNAL_ERROR
-        print("Backtest: SUCCESS")
+        print(format_terminal_summary(result))
         return 0
     if args.command != "validate":
         parser.print_help(sys.stderr)
