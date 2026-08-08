@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metrbot-lab"
+dynamic = ["version"]
+description = "A deterministic, extensible OHLC backtesting framework."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Metrbot Lab contributors"}]
+dependencies = []
+
+[tool.setuptools.dynamic]
+version = {attr = "metrbot_lab.version.__version__"}
+
+[tool.setuptools]
+package-dir = {metrbot_lab = "src", "metrbot_lab.domain" = "src/domain"}
+packages = ["metrbot_lab", "metrbot_lab.domain"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "__pycache__/*"]
