@@ -5,6 +5,7 @@ from .context import StrategyContext, freeze_parameters
 from .adapter import StrategyAdapter, run_strategy
 from .registry import BUILTIN_REGISTRY, StrategyDescriptor, StrategyRegistry, register
 from .loader import load_custom_strategy, load_strategy, resolve_import_path
+from .candle_pulse import CandlePulseStrategy
 
 __all__ = [
     "Strategy",
@@ -23,4 +24,5 @@ __all__ = [
     "load_custom_strategy",
     "load_strategy",
     "resolve_import_path",
+    "CandlePulseStrategy",
 ]
