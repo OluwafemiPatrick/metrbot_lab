@@ -221,6 +221,7 @@ class RunMetadata(SerializableRecord):
     python_version: str = _EMPTY_TEXT
     run_fingerprint: str = _EMPTY_TEXT
     strategy: str = _EMPTY_TEXT
+    strategy_source_sha256: str = _EMPTY_TEXT
     input_sha256: str = _EMPTY_TEXT
     input_row_count: int = 0
     input_first_timestamp: datetime | None = None
@@ -236,6 +237,7 @@ class RunMetadata(SerializableRecord):
             ("python_version", self.python_version),
             ("run_fingerprint", self.run_fingerprint),
             ("strategy", self.strategy),
+            ("strategy_source_sha256", self.strategy_source_sha256),
             ("input_sha256", self.input_sha256),
         ):
             if not isinstance(value, str):
