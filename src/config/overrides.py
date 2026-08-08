@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from ..domain.account import RunConfig
+from ..domain.account import MAX_SLIPPAGE_BPS, RunConfig
 from ..domain.base import to_json_compatible
 from ..errors import ConfigurationValidationError, ErrorCode
 from .loader import config_from_mapping, read_toml_mapping
@@ -139,6 +139,8 @@ def _validate_override(name: object, value: object) -> None:
         _raise_override(name, "must be greater than zero")
     if name in _NON_NEGATIVE_OVERRIDES and number < 0:
         _raise_override(name, "must not be negative")
+    if name == "slippage_bps" and number >= MAX_SLIPPAGE_BPS:
+        _raise_override(name, "must be less than 10000 to preserve positive sell fills")
     if name == "max_drawdown_pct" and number <= 0:
         _raise_override(name, "must be greater than zero or None")
 

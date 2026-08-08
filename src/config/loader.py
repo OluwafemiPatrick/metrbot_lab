@@ -9,7 +9,7 @@ from pathlib import Path
 import tomllib
 from typing import Any
 
-from ..domain.account import RunConfig
+from ..domain.account import MAX_SLIPPAGE_BPS, RunConfig
 from ..errors import ConfigurationValidationError, ErrorCode
 from .schema import (
     ALLOWED_SECTIONS,
@@ -120,6 +120,13 @@ def config_from_mapping(raw: Mapping[str, object], *, source: str = "<mapping>")
         field="execution.slippage_bps",
         source=source,
     )
+    if slippage_bps >= MAX_SLIPPAGE_BPS:
+        raise ConfigurationValidationError(
+            ErrorCode.INVALID_CONFIGURATION,
+            "must be less than 10000 to preserve positive sell fills",
+            field="execution.slippage_bps",
+            context={"source": source},
+        )
     max_position_quantity = _positive_number(
         risk.get("max_position_quantity", 1.0),
         field="risk.max_position_quantity",

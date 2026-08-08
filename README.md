@@ -18,6 +18,9 @@ override TOML values. Read [DATA_GUIDE.md](DATA_GUIDE.md), [STRATEGY_GUIDE.md](S
 [CONFIGURATION_AND_RISK.md](CONFIGURATION_AND_RISK.md), and
 [EXECUTION_AND_REPORTING.md](EXECUTION_AND_REPORTING.md) for the public contracts.
 
+Numerical results use binary floating-point arithmetic. Aggregate sums use `math.fsum`, and
+reconciliation comparisons use `1e-9` relative and absolute tolerances.
+
 Exit codes are `0` for completion, `1` for strategy/internal failure, and `2` for invalid input,
 configuration, or strategy selection. This MVP has no live broker, database, web/GUI, downloader,
 calendar logic, or proprietary Metrbot code.

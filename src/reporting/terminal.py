@@ -42,6 +42,7 @@ def format_terminal_summary(
         f"Drawdown recovery: {_recovery_value(report)}",
         f"Commission: {_number(values['total_commission'])}",
         f"Slippage cost: {_number(values['total_slippage_cost'])}",
+        "Numerics: binary floating point; aggregate sums use math.fsum; reconciliation tolerance=1e-9",
         f"Fills: {result.counts.fills}",
         (
             "Risk decisions: "

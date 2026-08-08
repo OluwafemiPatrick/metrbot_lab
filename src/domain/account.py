@@ -6,9 +6,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from types import MappingProxyType
+from typing import Final
 
 from .base import SerializableRecord, require_finite, require_non_negative, require_positive, require_text
 from ..errors import DomainValidationError, ErrorCode
+
+
+MAX_SLIPPAGE_BPS: Final[float] = 10_000.0
 
 
 def _freeze_configuration_value(value: object, *, field_name: str, active: set[int]) -> object:
@@ -129,6 +133,12 @@ class RunConfig(SerializableRecord):
         require_positive(self.default_quantity, "default_quantity")
         require_non_negative(self.commission_bps, "commission_bps")
         require_non_negative(self.slippage_bps, "slippage_bps")
+        if self.slippage_bps >= MAX_SLIPPAGE_BPS:
+            raise DomainValidationError(
+                ErrorCode.INVALID_CONFIGURATION,
+                "slippage_bps must be less than 10000 to preserve positive sell fills",
+                field="slippage_bps",
+            )
         require_positive(self.max_position_quantity, "max_position_quantity")
         if self.default_quantity > self.max_position_quantity:
             raise DomainValidationError(

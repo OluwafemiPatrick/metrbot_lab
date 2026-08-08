@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from ..domain.account import MAX_SLIPPAGE_BPS
 from ..domain.base import SerializableRecord, require_datetime, require_non_negative, require_positive, require_text
 from ..domain.orders import OrderIntent
 from ..errors import DomainValidationError, ErrorCode
@@ -34,6 +35,12 @@ class ExecutionSettings(SerializableRecord):
         require_positive(self.initial_cash, "initial_cash")
         require_non_negative(self.commission_bps, "commission_bps")
         require_non_negative(self.slippage_bps, "slippage_bps")
+        if self.slippage_bps >= MAX_SLIPPAGE_BPS:
+            raise DomainValidationError(
+                ErrorCode.INVALID_CONFIGURATION,
+                "slippage_bps must be less than 10000 to preserve positive sell fills",
+                field="slippage_bps",
+            )
 
 
 @dataclass(frozen=True, slots=True)
