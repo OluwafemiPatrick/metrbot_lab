@@ -99,3 +99,10 @@ class RiskPolicy(Protocol):
 
     def evaluate(self, intent: OrderIntent, account: AccountSnapshot) -> RiskDecision:
         """Return an admission decision for the supplied account snapshot."""
+
+
+class RiskAccountObserver(Protocol):
+    """Optional per-bar account observation hook for stateful risk policies."""
+
+    def observe_account(self, account: AccountSnapshot) -> None:
+        """Observe account state independently of whether a strategy emitted an intent."""

@@ -61,6 +61,7 @@ class StrategyAdapter:
         prior_bars: list[Bar] = []
         for bar in bar_sequence:
             self._broker.process_bar(bar)
+            self._observe_risk_account()
             accepted_count, rejected_count = counts()
             context = self._context(bar, tuple(prior_bars), accepted_count, rejected_count)
             try:
@@ -92,6 +93,9 @@ class StrategyAdapter:
             sum(admission.accepted for admission in admissions),
             sum(not admission.accepted for admission in admissions),
         )
+
+    def _observe_risk_account(self) -> None:
+        """Leave account observation to risk-aware adapters."""
 
     def _validate_session(self, bars: Sequence[Bar]) -> None:
         if self._has_run or self._broker.finalized:
@@ -214,6 +218,25 @@ class RiskAwareStrategyAdapter(StrategyAdapter):
         self._risk_decisions.append(decision)
         if decision.accepted:
             self._broker.submit(decision.effective_intent, timestamp)
+
+    def _observe_risk_account(self) -> None:
+        observer = getattr(self._policy, "observe_account", None)
+        if observer is None:
+            return
+        if not callable(observer):
+            raise StrategyExecutionError(
+                ErrorCode.RISK_EVALUATION_FAILED,
+                "risk policy account observer is invalid",
+                field="risk",
+            )
+        try:
+            observer(self._broker.account)
+        except Exception as exc:
+            raise StrategyExecutionError(
+                ErrorCode.RISK_EVALUATION_FAILED,
+                "risk policy account observation failed",
+                field="risk",
+            ) from exc
 
     def _risk_counts(self) -> tuple[int, int]:
         return (

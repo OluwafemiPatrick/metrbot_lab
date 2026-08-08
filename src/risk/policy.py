@@ -35,6 +35,16 @@ class BasicRiskPolicy:
         """Return whether this policy has permanently locked new entries."""
         return self._drawdown_locked
 
+    def observe_account(self, account: AccountSnapshot) -> None:
+        """Record drawdown state even when the strategy emits no intent."""
+        if not isinstance(account, AccountSnapshot):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "account must be an AccountSnapshot",
+                field="account",
+            )
+        self._observe_account(account)
+
     def evaluate(self, intent: OrderIntent, account: AccountSnapshot) -> RiskDecision:
         """Evaluate one intent against the latest account snapshot."""
         if not isinstance(intent, OrderIntent):
@@ -47,11 +57,7 @@ class BasicRiskPolicy:
             )
 
         effective = self._normalize(intent)
-        if (
-            self._settings.max_drawdown_pct is not None
-            and account.drawdown_pct >= self._settings.max_drawdown_pct
-        ):
-            self._drawdown_locked = True
+        self._observe_account(account)
 
         if intent.action is OrderAction.CLOSE:
             return self._accepted(intent, effective, "close intent remains allowed")
@@ -79,6 +85,10 @@ class BasicRiskPolicy:
                 "new entries are locked after the configured drawdown",
             )
         return self._accepted(intent, effective, "entry accepted by the risk policy")
+
+    def _observe_account(self, account: AccountSnapshot) -> None:
+        if self._settings.max_drawdown_pct is not None and account.drawdown_pct >= self._settings.max_drawdown_pct:
+            self._drawdown_locked = True
 
     def _normalize(self, intent: OrderIntent) -> OrderIntent:
         if intent.action is OrderAction.CLOSE or intent.quantity is not None:
