@@ -1,26 +1,23 @@
 # Metrbot Lab
 
-Metrbot Lab is a local-first OHLC backtesting framework.
-
-MVP provides:
-
-- strict CSV validation for `Timestamp`, `Open`, `High`, `Low`, and `Close`;
-- deterministic next-candle-open execution with one signed position;
-- configurable commission, slippage, quantity, and drawdown limits;
-- built-in and custom `module:ClassName` strategies; and
-- a `backtest` CLI.
-
-Install and run:
+Metrbot Lab is a local-first, deterministic OHLC backtesting framework for developers and testers.
+It validates user-supplied CSV data, runs trusted built-in or custom Python strategies, simulates
+next-candle-open market execution, applies configurable costs and basic risk limits, and reports
+reproducible results.
 
 ```bash
 python -m pip install .
+metrbot-lab validate --data data/sample_ohlc.csv
+metrbot-lab list-strategies
 metrbot-lab backtest --data data/sample_ohlc.csv --strategy candle_pulse
 ```
 
-Use `--config PATH` for TOML settings; explicit CLI options override file values. TOML `data_path` values are relative to the config file, while `--data` is relative to the working directory. Custom modules must be importable; checkout-local modules are supported.
+Successful runs print a terminal summary and create exactly `summary.json`, `trades.csv`, and
+`equity.csv` under `backtests/`. Use `--config configs/candle-pulse.toml`; explicit CLI options
+override TOML values. Read [DATA_GUIDE.md](DATA_GUIDE.md), [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md),
+[CONFIGURATION_AND_RISK.md](CONFIGURATION_AND_RISK.md), and
+[EXECUTION_AND_REPORTING.md](EXECUTION_AND_REPORTING.md) for the public contracts.
 
-Success writes `summary.json`, `trades.csv`, and `equity.csv` under `backtests/`; terminal output includes metrics.
-
-Exit codes: `0` means completion, `1` means strategy/internal failure, and `2` means invalid input, configuration, or strategy selection.
-
-Project excludes live broker execution, databases, web/GUI layers, market calendars, and proprietary Metrbot code.
+Exit codes are `0` for completion, `1` for strategy/internal failure, and `2` for invalid input,
+configuration, or strategy selection. This MVP has no live broker, database, web/GUI, downloader,
+calendar logic, or proprietary Metrbot code.
