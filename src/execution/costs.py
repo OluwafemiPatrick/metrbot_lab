@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 
-from ..domain.base import SerializableRecord, require_finite, require_positive
+from ..domain.base import SerializableRecord, require_finite, require_non_negative, require_positive
 from ..domain.orders import OrderAction
 from ..domain.results import TradeSide
 from ..errors import DomainValidationError, ErrorCode
@@ -25,25 +25,9 @@ class CostBreakdown(SerializableRecord):
     def __post_init__(self) -> None:
         require_positive(self.reference_price, "reference_price")
         require_positive(self.effective_price, "effective_price")
-        require_finite(self.slippage_amount, "slippage_amount")
-        if self.slippage_amount < 0:
-            raise DomainValidationError(
-                ErrorCode.INVALID_VALUE,
-                "slippage_amount must not be negative",
-                field="slippage_amount",
-            )
-        if self.slippage_cost < 0 or not math.isfinite(self.slippage_cost):
-            raise DomainValidationError(
-                ErrorCode.INVALID_VALUE,
-                "slippage_cost must be finite and non-negative",
-                field="slippage_cost",
-            )
-        if self.commission < 0 or not math.isfinite(self.commission):
-            raise DomainValidationError(
-                ErrorCode.INVALID_VALUE,
-                "commission must be finite and non-negative",
-                field="commission",
-            )
+        require_non_negative(self.slippage_amount, "slippage_amount")
+        require_non_negative(self.slippage_cost, "slippage_cost")
+        require_non_negative(self.commission, "commission")
 
 
 def calculate_fill_costs(
