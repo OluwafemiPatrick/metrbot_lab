@@ -11,7 +11,9 @@ from .candle_pulse import CandlePulseStrategy
 
 _LAZY_EXPORTS = {
     "StrategyAdapter": (".adapter", "StrategyAdapter"),
+    "RiskAwareStrategyAdapter": (".adapter", "RiskAwareStrategyAdapter"),
     "run_strategy": (".adapter", "run_strategy"),
+    "run_risk_aware_strategy": (".adapter", "run_risk_aware_strategy"),
     "load_custom_strategy": (".loader", "load_custom_strategy"),
     "load_strategy": (".loader", "load_strategy"),
     "resolve_import_path": (".loader", "resolve_import_path"),
@@ -37,7 +39,9 @@ __all__ = [
     "StrategyContext",
     "freeze_parameters",
     "StrategyAdapter",
+    "RiskAwareStrategyAdapter",
     "run_strategy",
+    "run_risk_aware_strategy",
     "BUILTIN_REGISTRY",
     "StrategyDescriptor",
     "StrategyRegistry",
