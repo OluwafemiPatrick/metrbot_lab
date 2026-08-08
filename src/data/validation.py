@@ -46,6 +46,12 @@ class ValidationReport(SerializableRecord):
             )
         require_datetime(self.first_timestamp, "first_timestamp")
         require_datetime(self.last_timestamp, "last_timestamp")
+        if timestamp_is_aware(self.first_timestamp) != timestamp_is_aware(self.last_timestamp):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "report timestamps must use one awareness mode",
+                field="timestamps",
+            )
         if self.last_timestamp < self.first_timestamp:
             raise DomainValidationError(
                 ErrorCode.INVALID_STATE,
@@ -85,6 +91,29 @@ class LoadedDataset(SerializableRecord):
                 "report must be a ValidationReport",
                 field="report",
             )
+        awareness_mode = timestamp_is_aware(self.bars[0].timestamp)
+        previous_timestamp = self.bars[0].timestamp
+        for bar in self.bars[1:]:
+            current_awareness = timestamp_is_aware(bar.timestamp)
+            if current_awareness != awareness_mode:
+                raise DomainValidationError(
+                    ErrorCode.MIXED_TIMEZONE_AWARENESS,
+                    "bars must use one timestamp awareness mode",
+                    field="bars",
+                )
+            if bar.timestamp == previous_timestamp:
+                raise DomainValidationError(
+                    ErrorCode.DUPLICATE_TIMESTAMP,
+                    "bars must not contain duplicate timestamps",
+                    field="bars",
+                )
+            if bar.timestamp < previous_timestamp:
+                raise DomainValidationError(
+                    ErrorCode.NON_MONOTONIC_TIMESTAMP,
+                    "bars timestamps must be strictly increasing",
+                    field="bars",
+                )
+            previous_timestamp = bar.timestamp
         if len(self.bars) != self.report.row_count:
             raise DomainValidationError(
                 ErrorCode.INVALID_STATE,
