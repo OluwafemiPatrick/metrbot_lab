@@ -17,7 +17,7 @@ from typing import Final
 from ..domain.base import to_json_compatible
 from ..domain.results import RunResult, Trade
 from ..errors import ErrorCode, ReportingError
-from .contracts import ArtifactBundle, MetricReport, validate_report_input
+from .contracts import ArtifactBundle, MetricReport, validate_metric_report, validate_report_input
 
 
 ARTIFACT_SCHEMA_VERSION: Final[int] = 1
@@ -69,6 +69,7 @@ _ARTIFACT_NAMES: Final[frozenset[str]] = frozenset({"summary.json", "trades.csv"
 def build_summary_payload(result: RunResult, metrics: MetricReport) -> dict[str, object]:
     """Build the stable summary mapping without writing to disk."""
     validate_report_input(result)
+    validate_metric_report(result, metrics)
     summary_metrics = dict(metrics.values)
     summary_metrics["recovery"] = dict(metrics.recovery)
     summary_metrics["unavailable_reasons"] = dict(metrics.unavailable_reasons)
@@ -178,8 +179,7 @@ def write_artifacts(
 ) -> ArtifactBundle:
     """Publish exactly three report files, or leave no successful report behind."""
     validate_report_input(result)
-    if not isinstance(metrics, MetricReport):
-        raise ReportingError(ErrorCode.REPORTING_ERROR, "artifact writing requires a MetricReport", field="metrics")
+    validate_metric_report(result, metrics)
     root = Path(output_root)
     staging: Path | None = None
     destination: Path | None = None

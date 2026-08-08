@@ -15,6 +15,35 @@ from ..errors import ErrorCode, ReportingError
 
 
 _EMPTY_MAPPING: Final[Mapping[str, object]] = {}
+REQUIRED_METRIC_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "starting_equity",
+        "ending_equity",
+        "net_pnl",
+        "gross_profit",
+        "gross_loss",
+        "total_return_pct",
+        "trade_count",
+        "winning_trade_count",
+        "losing_trade_count",
+        "breakeven_trade_count",
+        "win_rate",
+        "average_win",
+        "average_loss",
+        "payoff_ratio",
+        "expectancy_per_trade",
+        "profit_factor",
+        "max_drawdown_amount",
+        "max_drawdown_pct",
+        "max_drawdown_duration_bars",
+        "longest_winning_streak",
+        "longest_losing_streak",
+        "total_commission",
+        "total_slippage_cost",
+        "exposure_bar_count",
+        "total_exposure",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,10 +53,19 @@ class MetricReport(SerializableRecord):
     values: Mapping[str, float | int | None]
     unavailable_reasons: Mapping[str, str] = field(default_factory=dict)
     recovery: Mapping[str, object] = field(default_factory=dict)
+    run_fingerprint: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.values, Mapping):
             raise ReportingError(ErrorCode.REPORTING_ERROR, "metric values must be a mapping", field="values")
+        missing = REQUIRED_METRIC_KEYS.difference(self.values)
+        if missing:
+            raise ReportingError(
+                ErrorCode.REPORTING_ERROR,
+                "metric values are missing required fields",
+                field="values",
+                context={"missing": ",".join(sorted(missing))},
+            )
         for name, value in self.values.items():
             require_text(name, "metric_name")
             if value is not None:
@@ -62,6 +100,12 @@ class MetricReport(SerializableRecord):
                 )
         if not isinstance(self.recovery, Mapping):
             raise ReportingError(ErrorCode.REPORTING_ERROR, "recovery must be a mapping", field="recovery")
+        if not isinstance(self.run_fingerprint, str) or not self.run_fingerprint.strip():
+            raise ReportingError(
+                ErrorCode.REPORTING_ERROR,
+                "metric reports require a source run fingerprint",
+                field="run_fingerprint",
+            )
         try:
             to_json_compatible(self.recovery, field="recovery")
         except Exception as exc:
@@ -79,6 +123,18 @@ class MetricReport(SerializableRecord):
             freeze_configuration_mapping(self.unavailable_reasons, field_name="unavailable_reasons"),
         )
         object.__setattr__(self, "recovery", freeze_configuration_mapping(self.recovery, field_name="recovery"))
+
+
+def validate_metric_report(result: RunResult, metrics: MetricReport) -> None:
+    """Ensure a metric report is complete and belongs to the supplied run."""
+    if not isinstance(metrics, MetricReport):
+        raise ReportingError(ErrorCode.REPORTING_ERROR, "artifact writing requires a MetricReport", field="metrics")
+    if metrics.run_fingerprint != result.metadata.run_fingerprint:
+        raise ReportingError(
+            ErrorCode.REPORTING_ERROR,
+            "metric report fingerprint does not match the run",
+            field="run_fingerprint",
+        )
 
 
 @dataclass(frozen=True, slots=True)

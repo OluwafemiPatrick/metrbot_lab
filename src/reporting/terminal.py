@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..domain.results import RunResult
-from .contracts import MetricReport
+from .contracts import MetricReport, validate_metric_report
 from .metrics import calculate_metrics
 
 
@@ -16,6 +16,7 @@ def format_terminal_summary(
 ) -> str:
     """Format a completed run from one authoritative metric report."""
     report = calculate_metrics(result) if metrics is None else metrics
+    validate_metric_report(result, report)
     values = report.values
     lines = [
         "Backtest: SUCCESS",

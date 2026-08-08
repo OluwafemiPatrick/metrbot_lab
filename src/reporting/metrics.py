@@ -93,7 +93,7 @@ def calculate_metrics(result: RunResult) -> MetricReport:
         unavailable_reasons["expectancy_per_trade"] = "no completed trades"
     if profit_factor is None:
         unavailable_reasons["profit_factor"] = "gross loss is zero"
-    return MetricReport(values, unavailable_reasons, recovery)
+    return MetricReport(values, unavailable_reasons, recovery, result.metadata.run_fingerprint)
 
 
 def _initial_cash(configuration: Mapping[str, object]) -> float:
