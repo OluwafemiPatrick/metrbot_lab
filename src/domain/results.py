@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Final
 
+from .account import AccountSnapshot, freeze_configuration_mapping
 from .base import (
     SerializableRecord,
     require_datetime,
@@ -15,7 +18,11 @@ from .base import (
     require_text,
 )
 from .orders import OrderAction
+from .positions import Position
 from ..errors import DomainValidationError, ErrorCode
+
+
+_EMPTY_TEXT: Final[str] = ""
 
 
 class RunStatus(StrEnum):
@@ -200,12 +207,24 @@ class EquityPoint(SerializableRecord):
 
 @dataclass(frozen=True, slots=True)
 class RunMetadata(SerializableRecord):
-    """Minimal typed metadata available before reporting is implemented."""
+    """Typed metadata identifying one completed backtest run.
+
+    The fields added after ``created_at`` are defaulted intentionally. Earlier
+    phases construct this record positionally, so the Phase 6 metadata must
+    extend rather than reorder the original contract.
+    """
 
     schema_version: int
     run_id: str
     engine_version: str
     created_at: datetime
+    python_version: str = _EMPTY_TEXT
+    run_fingerprint: str = _EMPTY_TEXT
+    strategy: str = _EMPTY_TEXT
+    input_sha256: str = _EMPTY_TEXT
+    input_row_count: int = 0
+    input_first_timestamp: datetime | None = None
+    input_last_timestamp: datetime | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.schema_version, int) or isinstance(self.schema_version, bool) or self.schema_version < 1:
@@ -213,16 +232,60 @@ class RunMetadata(SerializableRecord):
         require_text(self.run_id, "run_id")
         require_text(self.engine_version, "engine_version")
         require_datetime(self.created_at, "created_at")
+        for field_name, value in (
+            ("python_version", self.python_version),
+            ("run_fingerprint", self.run_fingerprint),
+            ("strategy", self.strategy),
+            ("input_sha256", self.input_sha256),
+        ):
+            if not isinstance(value, str):
+                raise DomainValidationError(ErrorCode.INVALID_VALUE, "must be text", field=field_name)
+            if value and not value.strip():
+                raise DomainValidationError(ErrorCode.INVALID_VALUE, "must not be blank", field=field_name)
+        if (
+            not isinstance(self.input_row_count, int)
+            or isinstance(self.input_row_count, bool)
+            or self.input_row_count < 0
+        ):
+            raise DomainValidationError(
+                ErrorCode.INVALID_VALUE,
+                "must be a non-negative integer",
+                field="input_row_count",
+            )
+        if (self.input_first_timestamp is None) != (self.input_last_timestamp is None):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "input timestamps must both be present or absent",
+                field="input_timestamps",
+            )
+        if self.input_first_timestamp is not None and self.input_last_timestamp is not None:
+            require_datetime(self.input_first_timestamp, "input_first_timestamp")
+            require_datetime(self.input_last_timestamp, "input_last_timestamp")
+            if self.input_last_timestamp < self.input_first_timestamp:
+                raise DomainValidationError(
+                    ErrorCode.INVALID_STATE,
+                    "input_last_timestamp must not precede input_first_timestamp",
+                    field="input_last_timestamp",
+                )
 
 
 @dataclass(frozen=True, slots=True)
 class RunCounts(SerializableRecord):
-    """Typed counters retained by a run result."""
+    """Typed counters retained by a run result.
+
+    The original intent/fill/trade fields remain first and retain their
+    positional meaning. Phase 6 adds explicit ownership to distinguish risk
+    decisions from broker admissions.
+    """
 
     intents_accepted: int = 0
     intents_rejected: int = 0
     fills: int = 0
     completed_trades: int = 0
+    risk_decisions_accepted: int = 0
+    risk_decisions_rejected: int = 0
+    broker_admissions_accepted: int = 0
+    broker_admissions_rejected: int = 0
 
     def __post_init__(self) -> None:
         for field_name, value in (
@@ -230,6 +293,10 @@ class RunCounts(SerializableRecord):
             ("intents_rejected", self.intents_rejected),
             ("fills", self.fills),
             ("completed_trades", self.completed_trades),
+            ("risk_decisions_accepted", self.risk_decisions_accepted),
+            ("risk_decisions_rejected", self.risk_decisions_rejected),
+            ("broker_admissions_accepted", self.broker_admissions_accepted),
+            ("broker_admissions_rejected", self.broker_admissions_rejected),
         ):
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
                 raise DomainValidationError(ErrorCode.INVALID_VALUE, "must be a non-negative integer", field=field_name)
@@ -237,7 +304,13 @@ class RunCounts(SerializableRecord):
 
 @dataclass(frozen=True, slots=True)
 class RunResult(SerializableRecord):
-    """Typed result envelope without metrics or artifact-writing behavior."""
+    """Typed result envelope without metrics or artifact-writing behavior.
+
+    Phase 6 fields are appended after the Phase 1 fields so existing callers
+    remain source-compatible. ``risk_decisions`` and ``admissions`` use the
+    shared serializable-record boundary to avoid making the domain package
+    import risk or execution packages during initialization.
+    """
 
     status: RunStatus
     metadata: RunMetadata
@@ -245,6 +318,13 @@ class RunResult(SerializableRecord):
     equity: tuple[EquityPoint, ...] = ()
     warnings: tuple[str, ...] = ()
     counts: RunCounts = RunCounts()
+    fills: tuple[Fill, ...] = ()
+    risk_decisions: tuple[SerializableRecord, ...] = ()
+    admissions: tuple[SerializableRecord, ...] = ()
+    final_position: Position | None = None
+    final_account: AccountSnapshot | None = None
+    pending_order_cancelled: bool = False
+    effective_configuration: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         status = self.status
@@ -280,3 +360,46 @@ class RunResult(SerializableRecord):
             )
         if not isinstance(self.counts, RunCounts):
             raise DomainValidationError(ErrorCode.INVALID_STATE, "counts must be RunCounts", field="counts")
+        if not isinstance(self.fills, tuple) or not all(isinstance(item, Fill) for item in self.fills):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "fills must be a tuple of Fill records",
+                field="fills",
+            )
+        for field_name in ("risk_decisions", "admissions"):
+            value = getattr(self, field_name)
+            if not isinstance(value, tuple) or not all(isinstance(item, SerializableRecord) for item in value):
+                raise DomainValidationError(
+                    ErrorCode.INVALID_STATE,
+                    f"{field_name} must be a tuple of serializable records",
+                    field=field_name,
+                )
+        if self.final_position is not None and not isinstance(self.final_position, Position):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "final_position must be a Position record",
+                field="final_position",
+            )
+        if self.final_account is not None and not isinstance(self.final_account, AccountSnapshot):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "final_account must be an AccountSnapshot record",
+                field="final_account",
+            )
+        if not isinstance(self.pending_order_cancelled, bool):
+            raise DomainValidationError(
+                ErrorCode.INVALID_VALUE,
+                "pending_order_cancelled must be a boolean",
+                field="pending_order_cancelled",
+            )
+        if not isinstance(self.effective_configuration, Mapping):
+            raise DomainValidationError(
+                ErrorCode.INVALID_CONFIGURATION,
+                "effective_configuration must be a mapping",
+                field="effective_configuration",
+            )
+        object.__setattr__(
+            self,
+            "effective_configuration",
+            freeze_configuration_mapping(self.effective_configuration, field_name="effective_configuration"),
+        )
