@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ..domain.base import SerializableRecord, require_datetime, require_text
-from ..domain.results import Fill
+from ..domain.results import Fill, Trade
 from ..domain.orders import OrderIntent
 from ..domain.positions import Position
 from ..errors import DomainValidationError, ErrorCode
@@ -34,6 +34,7 @@ class BarExecution(SerializableRecord):
     timestamp: datetime
     fills: tuple[Fill, ...]
     position: Position
+    trades: tuple[Trade, ...] = ()
 
     def __post_init__(self) -> None:
         require_datetime(self.timestamp, "timestamp")
@@ -48,6 +49,12 @@ class BarExecution(SerializableRecord):
                 ErrorCode.INVALID_STATE,
                 "position must be a Position record",
                 field="position",
+            )
+        if not isinstance(self.trades, tuple) or not all(isinstance(item, Trade) for item in self.trades):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "trades must be a tuple of Trade records",
+                field="trades",
             )
 
 

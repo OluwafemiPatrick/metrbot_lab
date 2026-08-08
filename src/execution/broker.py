@@ -2,24 +2,32 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 
 from ..domain.base import require_datetime, require_text
 from ..domain.bars import Bar
 from ..domain.orders import OrderAction, OrderIntent
 from ..domain.positions import Position
-from ..domain.results import Fill
+from ..domain.results import ExitReason, Fill, Trade, TradeSide
 from ..errors import DomainValidationError, ErrorCode
 from .contracts import ExecutionReason, ExecutionSettings, IdentifierAllocator, OrderAdmission
-from .costs import calculate_fill_costs
+from .costs import (
+    CostBreakdown,
+    calculate_fill_costs,
+    calculate_gross_pnl,
+    calculate_net_pnl,
+    calculate_return_pct,
+    calculate_r_multiple,
+)
 from .state import BarExecution, PendingOrder, PositionLedger
 
 
 class Broker:
     """Single-position broker shell with explicit pending-intent admission.
 
-    Bar processing and accounting are added in later Phase 3 steps. Until then, this
-    boundary only accepts lifecycle-valid intents and retains one immutable pending order.
+    Bar processing, protective exits, and trade construction are implemented here; synthetic
+    account and finalization behavior are added in later Phase 3 steps.
     """
 
     __slots__ = (
@@ -32,6 +40,7 @@ class Broker:
         "_pending",
         "_settings",
         "_symbol",
+        "_trades",
     )
 
     def __init__(self, settings: ExecutionSettings, *, symbol: str = "UNSPECIFIED") -> None:
@@ -49,6 +58,7 @@ class Broker:
         self._pending: PendingOrder | None = None
         self._entry_fill: Fill | None = None
         self._fills: list[Fill] = []
+        self._trades: list[Trade] = []
         self._last_timestamp: datetime | None = None
         self._finalized = False
 
@@ -81,6 +91,11 @@ class Broker:
     def fills(self) -> tuple[Fill, ...]:
         """Return all fills produced by this session in execution order."""
         return tuple(self._fills)
+
+    @property
+    def trades(self) -> tuple[Trade, ...]:
+        """Return completed trades in deterministic close order."""
+        return tuple(self._trades)
 
     def submit(self, intent: OrderIntent, decision_timestamp: datetime) -> OrderAdmission:
         """Admit or structurally reject one intent for the next bar."""
@@ -163,13 +178,24 @@ class Broker:
 
         self._last_timestamp = bar.timestamp
         self._pending = None
+        trade_count = len(self._trades)
         bar_fills: list[Fill] = []
         if pending is not None:
             fill = self._fill_pending(pending, bar)
             bar_fills.append(fill)
             self._fills.append(fill)
+        if self._ledger.position.quantity != 0:
+            protective_fill = self._evaluate_protection(bar)
+            if protective_fill is not None:
+                bar_fills.append(protective_fill)
+                self._fills.append(protective_fill)
 
-        return BarExecution(bar.timestamp, tuple(bar_fills), self._ledger.position)
+        return BarExecution(
+            bar.timestamp,
+            tuple(bar_fills),
+            self._ledger.position,
+            tuple(self._trades[trade_count:]),
+        )
 
     def _fill_pending(self, pending: PendingOrder, bar: Bar) -> Fill:
         intent = pending.intent
@@ -234,8 +260,130 @@ class Broker:
             reason=intent.reason,
             position_id=position.position_id,
         )
+        self._complete_trade(fill, ExitReason.STRATEGY_CLOSE, position)
         self._ledger.close()
         return fill
+
+    def _evaluate_protection(self, bar: Bar) -> Fill | None:
+        position = self._ledger.position
+        selected = self._select_protective_exit(position, bar)
+        if selected is None:
+            return None
+        exit_reason, reference_price = selected
+        exit_action = OrderAction.SELL if position.quantity > 0 else OrderAction.BUY
+        quantity = abs(position.quantity)
+        costs = calculate_fill_costs(exit_action, reference_price, quantity, self._settings)
+        position_id = position.position_id
+        if position_id is None:  # pragma: no cover - open Position always has an identifier
+            raise DomainValidationError(ErrorCode.INVALID_STATE, "open position is missing an identifier")
+        order_id = self._allocator.next_order_id()
+        fill = Fill(
+            order_id=order_id,
+            action=exit_action,
+            quantity=quantity,
+            decision_timestamp=bar.timestamp,
+            fill_timestamp=bar.timestamp,
+            reference_price=costs.reference_price,
+            effective_price=costs.effective_price,
+            slippage_amount=costs.slippage_amount,
+            slippage_cost=costs.slippage_cost,
+            commission=costs.commission,
+            strategy_tag=position.strategy_tag,
+            reason=exit_reason.value,
+            position_id=position_id,
+        )
+        self._complete_trade(fill, exit_reason, position)
+        self._ledger.close()
+        return fill
+
+    @staticmethod
+    def _select_protective_exit(position: Position, bar: Bar) -> tuple[ExitReason, float] | None:
+        """Select one protective level using the fixed stop-first event rule."""
+        if position.quantity > 0:
+            if position.stop_loss is not None:
+                if bar.open <= position.stop_loss:
+                    return ExitReason.STOP_LOSS, bar.open
+                if bar.low <= position.stop_loss:
+                    return ExitReason.STOP_LOSS, position.stop_loss
+            if position.take_profit is not None:
+                if bar.open >= position.take_profit:
+                    return ExitReason.TAKE_PROFIT, bar.open
+                if bar.high >= position.take_profit:
+                    return ExitReason.TAKE_PROFIT, position.take_profit
+            return None
+
+        if position.stop_loss is not None:
+            if bar.open >= position.stop_loss:
+                return ExitReason.STOP_LOSS, bar.open
+            if bar.high >= position.stop_loss:
+                return ExitReason.STOP_LOSS, position.stop_loss
+        if position.take_profit is not None:
+            if bar.open <= position.take_profit:
+                return ExitReason.TAKE_PROFIT, bar.open
+            if bar.low <= position.take_profit:
+                return ExitReason.TAKE_PROFIT, position.take_profit
+        return None
+
+    def _complete_trade(self, exit_fill: Fill, exit_reason: ExitReason, position: Position) -> Trade:
+        entry_fill = self._entry_fill
+        if entry_fill is None:
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "an exit cannot complete a trade without an entry fill",
+                field="entry_fill",
+            )
+        if position.position_id is None or position.entry_timestamp is None:
+            raise DomainValidationError(ErrorCode.INVALID_STATE, "open position is missing entry metadata")
+        if position.reference_entry_price is None:
+            raise DomainValidationError(ErrorCode.INVALID_STATE, "open position is missing entry price")
+
+        quantity = abs(position.quantity)
+        side = TradeSide.LONG if position.quantity > 0 else TradeSide.SHORT
+        entry_costs = self._costs_from_fill(entry_fill)
+        exit_costs = self._costs_from_fill(exit_fill)
+        gross_pnl = calculate_gross_pnl(side, position.reference_entry_price, exit_fill.reference_price, quantity)
+        net_pnl = calculate_net_pnl(gross_pnl, entry_costs, exit_costs)
+        trade = Trade(
+            trade_id=self._allocator.next_trade_id(),
+            position_id=position.position_id,
+            entry_order_id=entry_fill.order_id,
+            exit_order_id=exit_fill.order_id,
+            side=side,
+            entry_timestamp=position.entry_timestamp,
+            exit_timestamp=exit_fill.fill_timestamp,
+            reference_entry_price=position.reference_entry_price,
+            effective_entry_price=entry_fill.effective_price,
+            reference_exit_price=exit_fill.reference_price,
+            effective_exit_price=exit_fill.effective_price,
+            quantity=quantity,
+            gross_pnl=gross_pnl,
+            commission=math.fsum((entry_fill.commission, exit_fill.commission)),
+            slippage_cost=math.fsum((entry_fill.slippage_cost, exit_fill.slippage_cost)),
+            net_pnl=net_pnl,
+            return_pct=calculate_return_pct(net_pnl, position.reference_entry_price, quantity),
+            r_multiple=calculate_r_multiple(
+                net_pnl,
+                position.reference_entry_price,
+                position.stop_loss,
+                quantity,
+            ),
+            exit_reason=exit_reason,
+            strategy_tag=position.strategy_tag,
+            entry_reason=entry_fill.reason,
+        )
+        self._trades.append(trade)
+        self._entry_fill = None
+        return trade
+
+    @staticmethod
+    def _costs_from_fill(fill: Fill) -> CostBreakdown:
+        return CostBreakdown(
+            reference_price=fill.reference_price,
+            effective_price=fill.effective_price,
+            slippage_amount=fill.slippage_amount,
+            slippage_cost=fill.slippage_cost,
+            commission=fill.commission,
+        )
 
     @staticmethod
     def _reject(
