@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import fields, is_dataclass
-from datetime import datetime
+from datetime import date, datetime, time
 from enum import Enum
 import json
 import math
@@ -48,6 +48,8 @@ def to_json_compatible(value: Any, *, field: str | None = None) -> Any:
     if isinstance(value, Enum):
         return to_json_compatible(value.value, field=field)
     if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (date, time)):
         return value.isoformat()
     if is_dataclass(value):
         return {
