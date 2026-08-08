@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..execution.results import ExecutionResult
 from ..domain.base import SerializableRecord
 from ..errors import DomainValidationError, ErrorCode
 from .contracts import RiskDecision, RiskReason
-from ..execution.results import ExecutionResult
 
 
 @dataclass(frozen=True, slots=True)
