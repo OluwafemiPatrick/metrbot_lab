@@ -13,6 +13,7 @@ from .errors import (
     ConfigurationValidationError,
     DataValidationError,
     ErrorCode,
+    ReportingError,
     RunIdentityError,
     StrategyExecutionError,
     StrategyValidationError,
@@ -51,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Run one strategy over a CSV containing Timestamp, Open, High, Low, and Close columns. "
             "Use --config for a TOML configuration or provide --data and --strategy directly. "
-            "Phase 6 prints a terminal summary; detailed report artifacts are deferred to Phase 7."
+            "A successful run writes summary.json, trades.csv, and equity.csv under backtests/."
         ),
     )
     _add_optional_argument(backtest, "--config", help="path to a strict TOML configuration file")
@@ -85,7 +86,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "backtest":
         try:
             config = _resolve_backtest_config(args)
-            from .engine import BacktestRunner, format_terminal_summary
+            from .engine import BacktestRunner
+            from .reporting import calculate_metrics, write_artifacts
+            from .reporting.terminal import format_terminal_summary
 
             result = BacktestRunner().run(config, input_path=_resolve_backtest_input_path(args, config))
         except (
@@ -96,7 +99,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ) as exc:
             print(_format_cli_error(exc), file=sys.stderr)
             return INPUT_ERROR
-        except StrategyExecutionError as exc:
+        except (ReportingError, StrategyExecutionError) as exc:
             print(_format_cli_error(exc), file=sys.stderr)
             return INTERNAL_ERROR
         except Exception:
@@ -105,7 +108,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if result.status != "SUCCESS":  # pragma: no cover - RunResult currently only returns completed success
             print("[INTERNAL_ERROR] backtest did not complete successfully", file=sys.stderr)
             return INTERNAL_ERROR
-        print(format_terminal_summary(result))
+        try:
+            metrics = calculate_metrics(result)
+            artifacts = write_artifacts(result, metrics)
+        except ReportingError as exc:
+            print(_format_cli_error(exc), file=sys.stderr)
+            return INTERNAL_ERROR
+        print(format_terminal_summary(result, metrics, artifacts.directory))
         return 0
     if args.command != "validate":
         parser.print_help(sys.stderr)
@@ -147,7 +156,10 @@ def _format_data_error(error: DataValidationError) -> str:
 
 def _format_cli_error(error: Exception) -> str:
     """Format a structured public error without exposing chained exception text."""
-    if isinstance(error, (ConfigurationValidationError, DataValidationError, RunIdentityError, StrategyValidationError)):
+    if isinstance(
+        error,
+        (ConfigurationValidationError, DataValidationError, RunIdentityError, StrategyValidationError, ReportingError),
+    ):
         return str(error)
     if isinstance(error, StrategyExecutionError):
         return str(error)
