@@ -12,7 +12,7 @@ from .costs import (
     calculate_unrealized_pnl,
 )
 from .broker import Broker
-from .state import PendingOrder, PositionLedger
+from .state import BarExecution, PendingOrder, PositionLedger
 
 __all__ = [
     "CostBreakdown",
@@ -21,6 +21,7 @@ __all__ = [
     "IdentifierAllocator",
     "OrderAdmission",
     "Broker",
+    "BarExecution",
     "PendingOrder",
     "PositionLedger",
     "calculate_fill_costs",

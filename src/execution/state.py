@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ..domain.base import SerializableRecord, require_datetime, require_text
+from ..domain.results import Fill
 from ..domain.orders import OrderIntent
 from ..domain.positions import Position
 from ..errors import DomainValidationError, ErrorCode
@@ -24,6 +25,30 @@ class PendingOrder(SerializableRecord):
         if not isinstance(self.intent, OrderIntent):
             raise DomainValidationError(ErrorCode.INVALID_STATE, "intent must be an OrderIntent", field="intent")
         require_datetime(self.decision_timestamp, "decision_timestamp")
+
+
+@dataclass(frozen=True, slots=True)
+class BarExecution(SerializableRecord):
+    """Immutable per-bar event returned by the broker boundary."""
+
+    timestamp: datetime
+    fills: tuple[Fill, ...]
+    position: Position
+
+    def __post_init__(self) -> None:
+        require_datetime(self.timestamp, "timestamp")
+        if not isinstance(self.fills, tuple) or not all(isinstance(item, Fill) for item in self.fills):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "fills must be a tuple of Fill records",
+                field="fills",
+            )
+        if not isinstance(self.position, Position):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "position must be a Position record",
+                field="position",
+            )
 
 
 class PositionLedger:
