@@ -38,6 +38,13 @@ class ErrorCode(StrEnum):
     NON_MONOTONIC_TIMESTAMP = "NON_MONOTONIC_TIMESTAMP"
     EMPTY_SYMBOL = "EMPTY_SYMBOL"
     MULTIPLE_SYMBOLS = "MULTIPLE_SYMBOLS"
+    INVALID_STRATEGY_NAME = "INVALID_STRATEGY_NAME"
+    DUPLICATE_STRATEGY = "DUPLICATE_STRATEGY"
+    UNKNOWN_STRATEGY = "UNKNOWN_STRATEGY"
+    INVALID_STRATEGY = "INVALID_STRATEGY"
+    INVALID_STRATEGY_RESULT = "INVALID_STRATEGY_RESULT"
+    INVALID_STRATEGY_PARAMETERS = "INVALID_STRATEGY_PARAMETERS"
+    STRATEGY_EXECUTION_FAILED = "STRATEGY_EXECUTION_FAILED"
 
 
 class MetrbotLabError(Exception):
@@ -112,3 +119,15 @@ class DataValidationError(MetrbotLabError):
 
 class SerializationError(MetrbotLabError):
     """Raised when a public domain value cannot be serialized safely."""
+
+
+class StrategyError(MetrbotLabError):
+    """Base exception for the public strategy SDK boundary."""
+
+
+class StrategyValidationError(StrategyError):
+    """Raised when a strategy, parameter set, or callback result violates its contract."""
+
+
+class StrategyExecutionError(StrategyError):
+    """Raised when a strategy callback fails during an execution session."""
