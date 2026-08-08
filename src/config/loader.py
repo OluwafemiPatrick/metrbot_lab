@@ -22,8 +22,8 @@ from .schema import (
 )
 
 
-def load_toml(path: str | Path) -> RunConfig:
-    """Read one TOML file and return a validated immutable ``RunConfig``."""
+def read_toml_mapping(path: str | Path) -> tuple[Mapping[str, object], str]:
+    """Read one TOML file and return its raw mapping plus a safe source label."""
     try:
         input_path = Path(path)
     except (TypeError, ValueError) as exc:
@@ -48,6 +48,12 @@ def load_toml(path: str | Path) -> RunConfig:
     except (PermissionError, OSError) as exc:
         raise _file_error(ErrorCode.CONFIGURATION_FILE_ERROR, "configuration file could not be read", source) from exc
 
+    return raw, source
+
+
+def load_toml(path: str | Path) -> RunConfig:
+    """Read one TOML file and return a validated immutable ``RunConfig``."""
+    raw, source = read_toml_mapping(path)
     return config_from_mapping(raw, source=source)
 
 
