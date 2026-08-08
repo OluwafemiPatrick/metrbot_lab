@@ -8,7 +8,14 @@ import sys
 
 from .config import apply_overrides, config_from_mapping, load_toml_with_overrides
 from .domain import RunConfig
-from .errors import ConfigurationValidationError, DataValidationError, ErrorCode
+from .errors import (
+    ConfigurationValidationError,
+    DataValidationError,
+    ErrorCode,
+    RunIdentityError,
+    StrategyExecutionError,
+    StrategyValidationError,
+)
 from .strategies import BUILTIN_REGISTRY
 
 
@@ -76,11 +83,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "backtest":
         try:
-            _resolve_backtest_config(args)
-        except ConfigurationValidationError as exc:
-            print(str(exc), file=sys.stderr)
+            config = _resolve_backtest_config(args)
+            from .engine import BacktestRunner
+
+            result = BacktestRunner().run(config)
+        except (
+            ConfigurationValidationError,
+            DataValidationError,
+            RunIdentityError,
+            StrategyValidationError,
+        ) as exc:
+            print(_format_cli_error(exc), file=sys.stderr)
             return INPUT_ERROR
-        print("Backtest configuration: OK")
+        except StrategyExecutionError as exc:
+            print(_format_cli_error(exc), file=sys.stderr)
+            return INTERNAL_ERROR
+        except Exception:
+            print("[INTERNAL_ERROR] backtest could not be completed", file=sys.stderr)
+            return INTERNAL_ERROR
+        if result.status != "SUCCESS":  # pragma: no cover - RunResult currently only returns completed success
+            print("[INTERNAL_ERROR] backtest did not complete successfully", file=sys.stderr)
+            return INTERNAL_ERROR
+        print("Backtest: SUCCESS")
         return 0
     if args.command != "validate":
         parser.print_help(sys.stderr)
@@ -118,6 +142,15 @@ def _format_data_error(error: DataValidationError) -> str:
     if error.row is not None:
         details.append(f"row={error.row}")
     return " ".join(details)
+
+
+def _format_cli_error(error: Exception) -> str:
+    """Format a structured public error without exposing chained exception text."""
+    if isinstance(error, (ConfigurationValidationError, DataValidationError, RunIdentityError, StrategyValidationError)):
+        return str(error)
+    if isinstance(error, StrategyExecutionError):
+        return str(error)
+    return "[INTERNAL_ERROR] operation could not be completed"
 
 
 def _resolve_backtest_config(args: argparse.Namespace) -> RunConfig:
