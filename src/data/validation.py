@@ -61,7 +61,7 @@ class ValidationReport(SerializableRecord):
                 field="volume_present",
             )
         _require_string_tuple(self.columns, "columns")
-        _require_string_tuple(self.extra_columns, "extra_columns")
+        _require_string_tuple(self.extra_columns, "extra_columns", allow_empty=True)
         _require_string_tuple(self.warnings, "warnings", allow_empty=True)
 
 
