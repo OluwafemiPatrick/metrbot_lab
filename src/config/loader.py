@@ -200,14 +200,30 @@ def _non_negative_number(value: object, *, field: str, source: str) -> float:
 
 
 def _number(value: object, *, field: str, source: str) -> float:
-    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise ConfigurationValidationError(
             ErrorCode.INVALID_CONFIGURATION,
             "must be a finite number",
             field=field,
             context={"source": source},
         )
-    return float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError) as exc:
+        raise ConfigurationValidationError(
+            ErrorCode.INVALID_CONFIGURATION,
+            "must be a finite number",
+            field=field,
+            context={"source": source},
+        ) from exc
+    if not math.isfinite(number):
+        raise ConfigurationValidationError(
+            ErrorCode.INVALID_CONFIGURATION,
+            "must be a finite number",
+            field=field,
+            context={"source": source},
+        )
+    return number
 
 
 def _file_error(code: ErrorCode, message: str, source: str) -> ConfigurationValidationError:

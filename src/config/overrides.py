@@ -127,9 +127,14 @@ def _validate_override(name: object, value: object) -> None:
         return
     if name == "max_drawdown_pct" and value is None:
         return
-    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
         _raise_override(name, "must be a finite number")
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        _raise_override(name, "must be a finite number")
+    if not math.isfinite(number):
+        _raise_override(name, "must be a finite number")
     if name in _POSITIVE_OVERRIDES and number <= 0:
         _raise_override(name, "must be greater than zero")
     if name in _NON_NEGATIVE_OVERRIDES and number < 0:

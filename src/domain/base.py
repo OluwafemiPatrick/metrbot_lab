@@ -87,7 +87,13 @@ def require_text(value: str, field: str) -> None:
 
 
 def require_finite(value: float, field: str) -> None:
-    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise DomainValidationError(ErrorCode.INVALID_VALUE, "must be a finite number", field=field)
+    try:
+        finite = math.isfinite(float(value))
+    except (OverflowError, ValueError):
+        finite = False
+    if not finite:
         raise DomainValidationError(ErrorCode.INVALID_VALUE, "must be a finite number", field=field)
 
 
