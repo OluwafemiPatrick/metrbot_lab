@@ -98,6 +98,16 @@ class MetricReport(SerializableRecord):
                     "an unavailable reason requires a null metric",
                     field=name,
                 )
+        missing_reasons = {
+            name for name, value in self.values.items() if value is None and name not in self.unavailable_reasons
+        }
+        if missing_reasons:
+            raise ReportingError(
+                ErrorCode.REPORTING_ERROR,
+                "null metrics require an unavailable reason",
+                field="unavailable_reasons",
+                context={"missing": ",".join(sorted(missing_reasons))},
+            )
         if not isinstance(self.recovery, Mapping):
             raise ReportingError(ErrorCode.REPORTING_ERROR, "recovery must be a mapping", field="recovery")
         if not isinstance(self.run_fingerprint, str) or not self.run_fingerprint.strip():
@@ -126,7 +136,7 @@ class MetricReport(SerializableRecord):
 
 
 def validate_metric_report(result: RunResult, metrics: MetricReport) -> None:
-    """Ensure a metric report is complete and belongs to the supplied run."""
+    """Ensure a metric report is complete, authoritative, and tied to the supplied run."""
     if not isinstance(metrics, MetricReport):
         raise ReportingError(ErrorCode.REPORTING_ERROR, "artifact writing requires a MetricReport", field="metrics")
     if metrics.run_fingerprint != result.metadata.run_fingerprint:
@@ -134,6 +144,43 @@ def validate_metric_report(result: RunResult, metrics: MetricReport) -> None:
             ErrorCode.REPORTING_ERROR,
             "metric report fingerprint does not match the run",
             field="run_fingerprint",
+        )
+    from .metrics import calculate_metrics
+
+    expected = calculate_metrics(result)
+    if set(metrics.values) != set(expected.values):
+        raise ReportingError(
+            ErrorCode.REPORTING_ERROR,
+            "metric report fields do not match the canonical metric set",
+            field="values",
+        )
+    for name, expected_value in expected.values.items():
+        actual_value = metrics.values[name]
+        if expected_value is None or actual_value is None:
+            if actual_value is not expected_value:
+                raise ReportingError(
+                    ErrorCode.REPORTING_ERROR,
+                    "metric report value does not match the supplied run",
+                    field=name,
+                )
+            continue
+        if not isclose(float(actual_value), float(expected_value), rel_tol=1e-9, abs_tol=1e-9):
+            raise ReportingError(
+                ErrorCode.REPORTING_ERROR,
+                "metric report value does not match the supplied run",
+                field=name,
+            )
+    if dict(metrics.unavailable_reasons) != dict(expected.unavailable_reasons):
+        raise ReportingError(
+            ErrorCode.REPORTING_ERROR,
+            "metric report unavailable reasons do not match the supplied run",
+            field="unavailable_reasons",
+        )
+    if to_json_compatible(metrics.recovery) != to_json_compatible(expected.recovery):
+        raise ReportingError(
+            ErrorCode.REPORTING_ERROR,
+            "metric report recovery does not match the supplied run",
+            field="recovery",
         )
 
 

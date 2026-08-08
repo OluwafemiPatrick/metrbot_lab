@@ -65,8 +65,10 @@ metrbot-lab backtest --data sample_ohlc.csv --strategy candle_pulse
 
 ## Current self-review handoff
 
-Phase 8 implementation is complete and ready for external adversarial audit. The current evidence is
-258 passing unittest tests, compile/diff checks, a fresh 52-file wheel inspection, and successful
-external installed-wheel validation with exactly three report files. Ruff, mypy, pytest, coverage,
-hosted CI, dependency/license review, and public package-name confirmation remain release gates; they
-must be completed before marking the checklist as public-release GO.
+Phase 8 implementation is complete and the external adversarial audit is recorded. The top P2
+reporting-integrity issue has been remediated, and the current evidence is 261 passing unittest
+tests, compile/diff checks, a fresh 52-file wheel inspection, and successful external installed-wheel
+validation with exactly three report files. The P3 slippage-boundary and floating-point-disclosure
+findings remain open. Ruff, mypy, pytest, coverage, hosted CI, dependency/license review, and public
+package-name confirmation remain release gates; they must be completed before marking the checklist
+as public-release GO.
