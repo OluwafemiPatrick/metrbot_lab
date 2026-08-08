@@ -62,12 +62,12 @@ class CandlePulseStrategy:
                 "candle_pulse parameters must be a mapping",
                 field="parameters",
             )
-        unknown = sorted(set(parameters) - set(_DEFAULTS))
+        unknown = [key for key in parameters if not isinstance(key, str) or key not in _DEFAULTS]
         if unknown:
             raise StrategyValidationError(
                 ErrorCode.INVALID_STRATEGY_PARAMETERS,
                 "unknown candle_pulse parameter",
-                field=unknown[0],
+                field=unknown[0] if isinstance(unknown[0], str) else "parameters",
             )
         effective = {**_DEFAULTS, **dict(parameters)}
         self.lookback = _positive_integer(effective, "lookback")
