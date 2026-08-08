@@ -20,6 +20,7 @@ dev = [
     "pytest>=8.0,<9",
     "ruff>=0.6,<1",
     "mypy>=1.11,<2",
+    "coverage>=7.0,<8",
 ]
 
 [tool.setuptools.dynamic]
@@ -39,6 +40,7 @@ addopts = ["-ra"]
 [tool.ruff]
 target-version = "py311"
 line-length = 120
+exclude = [".venv", "build", "dist", "*.egg-info"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -47,3 +49,12 @@ quote-style = "double"
 python_version = "3.11"
 files = ["src"]
 strict = true
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false
