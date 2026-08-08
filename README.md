@@ -1,24 +1,24 @@
 # Metrbot Lab
 
-Metrbot Lab is a local-first Python backtesting framework for developers who want to test trading strategies against their own OHLC candle data.
+Metrbot Lab is a local-first OHLC backtesting framework.
 
-The MVP provides:
+The MVP includes:
 
 - strict CSV validation for `Timestamp`, `Open`, `High`, `Low`, and `Close`;
-- custom strategy loading through a documented interface;
-- deterministic next-candle-open market execution;
-- one signed net position per run;
-- configurable commission, slippage, quantity, and drawdown limits; and
-- a `backtest` CLI command with deterministic terminal summaries.
+- deterministic next-candle-open execution with one signed position;
+- configurable commission, slippage, quantity, and drawdown limits;
+- built-in and custom `module:ClassName` strategies; and
+- a `backtest` CLI with reproducible terminal summaries.
 
-Run a local backtest with:
+Install and run:
 
 ```bash
+python -m pip install .
 metrbot-lab backtest --data data/sample_ohlc.csv --strategy candle_pulse
 ```
 
-Detailed `summary.json`, `trades.csv`, and `equity.csv` artifacts are planned for the next MVP phase.
+Use `--config PATH` for TOML settings; explicit CLI options override file values. TOML `data_path` values are relative to the config file, while `--data` is relative to the working directory. Custom modules must be importable; checkout-local modules are supported.
 
-Custom strategies can be supplied as trusted `module:ClassName` references; the runner includes their source in the reproducibility fingerprint.
+Exit codes: `0` means completion, `1` means strategy/internal failure, and `2` means invalid input, configuration, or strategy selection. Reports are planned for Phase 7.
 
-The project is CLI-first and intentionally excludes live broker execution, databases, web or GUI layers, market calendars, and proprietary Metrbot code. It is an independently authored open-source project informed by lessons from the retired private Metrbot system.
+The project excludes live broker execution, databases, web/GUI layers, market calendars, and proprietary Metrbot code.
