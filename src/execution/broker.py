@@ -22,31 +22,35 @@ from .costs import (
     calculate_r_multiple,
     calculate_unrealized_pnl,
 )
+from .results import ExecutionResult
 from .state import BarExecution, PendingOrder, PositionLedger
 
 
 class Broker:
     """Single-position broker shell with explicit pending-intent admission.
 
-    Bar processing, protective exits, and trade construction are implemented here; synthetic
-    account and finalization behavior are added in later Phase 3 steps.
+    Bar processing, protective exits, trade construction, synthetic accounting, and finalization
+    are kept behind this narrow execution-only boundary.
     """
 
     __slots__ = (
         "_allocator",
         "_account",
+        "_admissions",
         "_cash",
         "_entry_fill",
         "_equity_points",
         "_finalized",
         "_fills",
         "_last_timestamp",
+        "_last_bar",
         "_ledger",
         "_pending",
         "_settings",
         "_symbol",
         "_trades",
         "_peak_equity",
+        "_result",
     )
 
     def __init__(self, settings: ExecutionSettings, *, symbol: str = "UNSPECIFIED") -> None:
@@ -72,12 +76,15 @@ class Broker:
             0.0,
         )
         self._equity_points: list[EquityPoint] = []
+        self._admissions: list[OrderAdmission] = []
         self._ledger = PositionLedger()
         self._pending: PendingOrder | None = None
         self._entry_fill: Fill | None = None
         self._fills: list[Fill] = []
         self._trades: list[Trade] = []
         self._last_timestamp: datetime | None = None
+        self._last_bar: Bar | None = None
+        self._result: ExecutionResult | None = None
         self._finalized = False
 
     @property
@@ -125,6 +132,16 @@ class Broker:
         """Return one immutable mark-to-market point per processed bar."""
         return tuple(self._equity_points)
 
+    @property
+    def admissions(self) -> tuple[OrderAdmission, ...]:
+        """Return accepted and rejected intent outcomes in submission order."""
+        return tuple(self._admissions)
+
+    @property
+    def result(self) -> ExecutionResult | None:
+        """Return the immutable final result after finalization, if available."""
+        return self._result
+
     def submit(self, intent: OrderIntent, decision_timestamp: datetime) -> OrderAdmission:
         """Admit or structurally reject one intent for the next bar."""
         if not isinstance(intent, OrderIntent):
@@ -132,55 +149,69 @@ class Broker:
         require_datetime(decision_timestamp, "decision_timestamp")
 
         if self._finalized:
-            return self._reject(intent, decision_timestamp, ExecutionReason.SESSION_FINALIZED, "session is finalized")
+            return self._record_admission(
+                self._reject(intent, decision_timestamp, ExecutionReason.SESSION_FINALIZED, "session is finalized")
+            )
         if self._pending is not None:
-            return self._reject(
-                intent,
-                decision_timestamp,
-                ExecutionReason.PENDING_ORDER_EXISTS,
-                "another intent is already pending",
+            return self._record_admission(
+                self._reject(
+                    intent,
+                    decision_timestamp,
+                    ExecutionReason.PENDING_ORDER_EXISTS,
+                    "another intent is already pending",
+                )
             )
 
         if intent.action in (OrderAction.BUY, OrderAction.SELL):
             if self._ledger.position.quantity != 0:
-                return self._reject(
-                    intent,
-                    decision_timestamp,
-                    ExecutionReason.POSITION_ALREADY_OPEN,
-                    "an entry cannot be submitted while a position is open",
+                return self._record_admission(
+                    self._reject(
+                        intent,
+                        decision_timestamp,
+                        ExecutionReason.POSITION_ALREADY_OPEN,
+                        "an entry cannot be submitted while a position is open",
+                    )
                 )
             if intent.quantity is None:
-                return self._reject(
-                    intent,
-                    decision_timestamp,
-                    ExecutionReason.INVALID_ORDER_STATE,
-                    "entry intents require an explicit quantity",
+                return self._record_admission(
+                    self._reject(
+                        intent,
+                        decision_timestamp,
+                        ExecutionReason.INVALID_ORDER_STATE,
+                        "entry intents require an explicit quantity",
+                    )
                 )
         elif intent.action is OrderAction.CLOSE:
             if self._ledger.position.quantity == 0:
-                return self._reject(
-                    intent,
-                    decision_timestamp,
-                    ExecutionReason.NO_POSITION_TO_CLOSE,
-                    "a close cannot be submitted while flat",
+                return self._record_admission(
+                    self._reject(
+                        intent,
+                        decision_timestamp,
+                        ExecutionReason.NO_POSITION_TO_CLOSE,
+                        "a close cannot be submitted while flat",
+                    )
                 )
         else:  # pragma: no cover - OrderIntent validates the enum
-            return self._reject(
-                intent,
-                decision_timestamp,
-                ExecutionReason.INVALID_ORDER_STATE,
-                "intent action is not supported by the broker",
+            return self._record_admission(
+                self._reject(
+                    intent,
+                    decision_timestamp,
+                    ExecutionReason.INVALID_ORDER_STATE,
+                    "intent action is not supported by the broker",
+                )
             )
 
         order_id = self._allocator.next_order_id()
         self._pending = PendingOrder(order_id, intent, decision_timestamp)
-        return OrderAdmission(
-            True,
-            intent,
-            decision_timestamp,
-            order_id,
-            ExecutionReason.ACCEPTED,
-            "intent accepted for the next bar",
+        return self._record_admission(
+            OrderAdmission(
+                True,
+                intent,
+                decision_timestamp,
+                order_id,
+                ExecutionReason.ACCEPTED,
+                "intent accepted for the next bar",
+            )
         )
 
     def process_bar(self, bar: Bar) -> BarExecution:
@@ -205,6 +236,7 @@ class Broker:
             )
 
         self._last_timestamp = bar.timestamp
+        self._last_bar = bar
         self._pending = None
         trade_count = len(self._trades)
         bar_fills: list[Fill] = []
@@ -226,6 +258,68 @@ class Broker:
             tuple(self._trades[trade_count:]),
             equity_point,
         )
+
+    def finalize(self) -> ExecutionResult:
+        """Cancel pending work, liquidate at the last close, and freeze the session result."""
+        if self._result is not None:
+            return self._result
+        if self._last_bar is None:
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "cannot finalize a session without at least one bar",
+                field="bars",
+            )
+
+        pending_order_cancelled = self._pending is not None
+        self._pending = None
+        if self._ledger.position.quantity != 0:
+            position = self._ledger.position
+            exit_action = OrderAction.SELL if position.quantity > 0 else OrderAction.BUY
+            quantity = abs(position.quantity)
+            costs = calculate_fill_costs(exit_action, self._last_bar.close, quantity, self._settings)
+            position_id = position.position_id
+            if position_id is None:  # pragma: no cover - open Position always has an identifier
+                raise DomainValidationError(ErrorCode.INVALID_STATE, "open position is missing an identifier")
+            fill = Fill(
+                order_id=self._allocator.next_order_id(),
+                action=exit_action,
+                quantity=quantity,
+                decision_timestamp=self._last_bar.timestamp,
+                fill_timestamp=self._last_bar.timestamp,
+                reference_price=costs.reference_price,
+                effective_price=costs.effective_price,
+                slippage_amount=costs.slippage_amount,
+                slippage_cost=costs.slippage_cost,
+                commission=costs.commission,
+                strategy_tag=position.strategy_tag,
+                reason=ExitReason.END_OF_DATA.value,
+                position_id=position_id,
+            )
+            trade_count = len(self._trades)
+            self._complete_trade(fill, ExitReason.END_OF_DATA, position)
+            self._ledger.close()
+            self._fills.append(fill)
+            if not self._equity_points:
+                raise DomainValidationError(ErrorCode.INVALID_STATE, "final bar has no equity point")
+            self._peak_equity = max(
+                self._settings.initial_cash,
+                *(point.peak_equity for point in self._equity_points[:-1]),
+            )
+            self._equity_points[-1] = self._record_equity(self._last_bar, append=False)
+            if len(self._trades) != trade_count + 1:  # pragma: no cover - defensive invariant
+                raise DomainValidationError(ErrorCode.INVALID_STATE, "final liquidation did not create one trade")
+
+        self._finalized = True
+        self._result = ExecutionResult(
+            fills=tuple(self._fills),
+            trades=tuple(self._trades),
+            equity=tuple(self._equity_points),
+            final_position=self._ledger.position,
+            final_account=self._account,
+            admissions=tuple(self._admissions),
+            pending_order_cancelled=pending_order_cancelled,
+        )
+        return self._result
 
     def _fill_pending(self, pending: PendingOrder, bar: Bar) -> Fill:
         intent = pending.intent
@@ -406,7 +500,7 @@ class Broker:
         self._entry_fill = None
         return trade
 
-    def _record_equity(self, bar: Bar) -> EquityPoint:
+    def _record_equity(self, bar: Bar, *, append: bool = True) -> EquityPoint:
         position = self._ledger.position
         if position.quantity == 0:
             unrealized_pnl = 0.0
@@ -450,8 +544,13 @@ class Broker:
             open_quantity=position.quantity,
             exposure=exposure,
         )
-        self._equity_points.append(point)
+        if append:
+            self._equity_points.append(point)
         return point
+
+    def _record_admission(self, admission: OrderAdmission) -> OrderAdmission:
+        self._admissions.append(admission)
+        return admission
 
     @staticmethod
     def _costs_from_fill(fill: Fill) -> CostBreakdown:

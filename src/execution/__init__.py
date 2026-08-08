@@ -12,6 +12,7 @@ from .costs import (
     calculate_unrealized_pnl,
 )
 from .broker import Broker
+from .results import ExecutionResult
 from .state import BarExecution, PendingOrder, PositionLedger
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "OrderAdmission",
     "Broker",
     "BarExecution",
+    "ExecutionResult",
     "PendingOrder",
     "PositionLedger",
     "calculate_fill_costs",
