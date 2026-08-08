@@ -97,6 +97,8 @@ class Trade(SerializableRecord):
 
     trade_id: str
     position_id: str
+    entry_order_id: str
+    exit_order_id: str
     side: TradeSide
     entry_timestamp: datetime
     exit_timestamp: datetime
@@ -118,6 +120,8 @@ class Trade(SerializableRecord):
     def __post_init__(self) -> None:
         require_text(self.trade_id, "trade_id")
         require_text(self.position_id, "position_id")
+        require_text(self.entry_order_id, "entry_order_id")
+        require_text(self.exit_order_id, "exit_order_id")
         side = self.side
         if isinstance(side, str):
             try:
