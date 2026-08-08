@@ -6,10 +6,11 @@ import math
 from datetime import datetime
 
 from ..domain.base import require_datetime, require_text
+from ..domain.account import AccountSnapshot
 from ..domain.bars import Bar
 from ..domain.orders import OrderAction, OrderIntent
 from ..domain.positions import Position
-from ..domain.results import ExitReason, Fill, Trade, TradeSide
+from ..domain.results import EquityPoint, ExitReason, Fill, Trade, TradeSide
 from ..errors import DomainValidationError, ErrorCode
 from .contracts import ExecutionReason, ExecutionSettings, IdentifierAllocator, OrderAdmission
 from .costs import (
@@ -19,6 +20,7 @@ from .costs import (
     calculate_net_pnl,
     calculate_return_pct,
     calculate_r_multiple,
+    calculate_unrealized_pnl,
 )
 from .state import BarExecution, PendingOrder, PositionLedger
 
@@ -32,7 +34,10 @@ class Broker:
 
     __slots__ = (
         "_allocator",
+        "_account",
+        "_cash",
         "_entry_fill",
+        "_equity_points",
         "_finalized",
         "_fills",
         "_last_timestamp",
@@ -41,6 +46,7 @@ class Broker:
         "_settings",
         "_symbol",
         "_trades",
+        "_peak_equity",
     )
 
     def __init__(self, settings: ExecutionSettings, *, symbol: str = "UNSPECIFIED") -> None:
@@ -54,6 +60,18 @@ class Broker:
         self._settings = settings
         self._symbol = symbol
         self._allocator = IdentifierAllocator()
+        self._cash = settings.initial_cash
+        self._peak_equity = settings.initial_cash
+        self._account = AccountSnapshot(
+            settings.initial_cash,
+            settings.initial_cash,
+            0.0,
+            settings.initial_cash,
+            settings.initial_cash,
+            0.0,
+            0.0,
+        )
+        self._equity_points: list[EquityPoint] = []
         self._ledger = PositionLedger()
         self._pending: PendingOrder | None = None
         self._entry_fill: Fill | None = None
@@ -96,6 +114,16 @@ class Broker:
     def trades(self) -> tuple[Trade, ...]:
         """Return completed trades in deterministic close order."""
         return tuple(self._trades)
+
+    @property
+    def account(self) -> AccountSnapshot:
+        """Return the latest immutable synthetic-account snapshot."""
+        return self._account
+
+    @property
+    def equity_points(self) -> tuple[EquityPoint, ...]:
+        """Return one immutable mark-to-market point per processed bar."""
+        return tuple(self._equity_points)
 
     def submit(self, intent: OrderIntent, decision_timestamp: datetime) -> OrderAdmission:
         """Admit or structurally reject one intent for the next bar."""
@@ -189,12 +217,14 @@ class Broker:
             if protective_fill is not None:
                 bar_fills.append(protective_fill)
                 self._fills.append(protective_fill)
+        equity_point = self._record_equity(bar)
 
         return BarExecution(
             bar.timestamp,
             tuple(bar_fills),
             self._ledger.position,
             tuple(self._trades[trade_count:]),
+            equity_point,
         )
 
     def _fill_pending(self, pending: PendingOrder, bar: Bar) -> Fill:
@@ -372,8 +402,56 @@ class Broker:
             entry_reason=entry_fill.reason,
         )
         self._trades.append(trade)
+        self._cash = math.fsum((self._cash, trade.net_pnl))
         self._entry_fill = None
         return trade
+
+    def _record_equity(self, bar: Bar) -> EquityPoint:
+        position = self._ledger.position
+        if position.quantity == 0:
+            unrealized_pnl = 0.0
+            exposure = 0.0
+        else:
+            entry_fill = self._entry_fill
+            if entry_fill is None or position.reference_entry_price is None:
+                raise DomainValidationError(ErrorCode.INVALID_STATE, "open position is missing entry costs")
+            side = TradeSide.LONG if position.quantity > 0 else TradeSide.SHORT
+            unrealized_pnl = calculate_unrealized_pnl(
+                side,
+                position.reference_entry_price,
+                bar.close,
+                abs(position.quantity),
+                self._costs_from_fill(entry_fill),
+            )
+            exposure = abs(bar.close * position.quantity)
+
+        equity = math.fsum((self._cash, unrealized_pnl))
+        self._peak_equity = max(self._peak_equity, equity)
+        drawdown_amount = max(0.0, self._peak_equity - equity)
+        drawdown_pct = drawdown_amount / self._peak_equity * 100.0
+        self._account = AccountSnapshot(
+            initial_cash=self._settings.initial_cash,
+            cash=self._cash,
+            unrealized_pnl=unrealized_pnl,
+            equity=equity,
+            peak_equity=self._peak_equity,
+            position_quantity=position.quantity,
+            exposure=exposure,
+        )
+        point = EquityPoint(
+            timestamp=bar.timestamp,
+            close=bar.close,
+            cash=self._cash,
+            unrealized_pnl=unrealized_pnl,
+            equity=equity,
+            peak_equity=self._peak_equity,
+            drawdown_amount=drawdown_amount,
+            drawdown_pct=drawdown_pct,
+            open_quantity=position.quantity,
+            exposure=exposure,
+        )
+        self._equity_points.append(point)
+        return point
 
     @staticmethod
     def _costs_from_fill(fill: Fill) -> CostBreakdown:
