@@ -1,5 +1,5 @@
 [run]
-data_path = "data/sample_ohlc.csv"
+data_path = "../data/sample_ohlc.csv"
 strategy = "candle_pulse"
 initial_cash = 10000.0
 default_quantity = 1.0

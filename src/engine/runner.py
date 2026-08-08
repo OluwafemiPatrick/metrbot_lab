@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from ..data import LoadedDataset, load_csv
 from ..domain.account import RunConfig
@@ -17,7 +18,7 @@ from .identity import RunIdentity, build_run_identity
 class BacktestRunner:
     """Compose the validated input, strategy, risk, broker, and result layers."""
 
-    def run(self, config: RunConfig) -> RunResult:
+    def run(self, config: RunConfig, *, input_path: str | Path | None = None) -> RunResult:
         """Run one fresh risk-aware session and return its finalized result."""
         if not isinstance(config, RunConfig):
             raise ConfigurationValidationError(
@@ -26,8 +27,9 @@ class BacktestRunner:
                 field="config",
             )
 
-        dataset = load_csv(config.data_path)
-        identity = build_run_identity(config.data_path, config)
+        resolved_input_path = config.data_path if input_path is None else input_path
+        dataset = load_csv(resolved_input_path)
+        identity = build_run_identity(resolved_input_path, config)
         symbol = dataset.report.symbol or "UNSPECIFIED"
         session = build_risk_aware_session(config, symbol=symbol)
         risk_result = session.run(dataset.bars)

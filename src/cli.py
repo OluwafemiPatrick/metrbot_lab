@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 import sys
 
 from .config import apply_overrides, config_from_mapping, load_toml_with_overrides
@@ -86,7 +87,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             config = _resolve_backtest_config(args)
             from .engine import BacktestRunner, format_terminal_summary
 
-            result = BacktestRunner().run(config)
+            result = BacktestRunner().run(config, input_path=_resolve_backtest_input_path(args, config))
         except (
             ConfigurationValidationError,
             DataValidationError,
@@ -198,6 +199,16 @@ def _explicit_backtest_overrides(args: argparse.Namespace) -> dict[str, object]:
         for source, target in mapping.items()
         if hasattr(args, source)
     }
+
+
+def _resolve_backtest_input_path(args: argparse.Namespace, config: RunConfig) -> str:
+    """Resolve config-relative data paths while preserving the raw config value."""
+    if hasattr(args, "data") or not hasattr(args, "config"):
+        return config.data_path
+    configured_path = Path(config.data_path)
+    if configured_path.is_absolute():
+        return str(configured_path)
+    return str((Path(args.config).resolve().parent / configured_path).resolve())
 
 
 def _add_optional_argument(parser: argparse.ArgumentParser, *flags: str, **kwargs: object) -> None:
