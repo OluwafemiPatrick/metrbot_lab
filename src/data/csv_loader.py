@@ -22,14 +22,14 @@ def load_csv(path: str | Path) -> LoadedDataset:
     try:
         with input_path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.reader(handle, strict=True)
-            headers = next(reader, None)
-            header_map = normalize_headers(headers or [], source=source)
             try:
+                headers = next(reader, None)
+                header_map = normalize_headers(headers or [], source=source)
                 validated = validate_rows(reader, header_map, source=source)
             except csv.Error as exc:
                 raise DataValidationError(
                     ErrorCode.MALFORMED_CSV,
-                    "CSV parser rejected a data row",
+                    "CSV parser rejected the input",
                     source=source,
                 ) from exc
     except UnicodeDecodeError as exc:
