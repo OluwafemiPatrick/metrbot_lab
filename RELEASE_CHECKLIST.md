@@ -62,3 +62,11 @@ metrbot-lab backtest --data sample_ohlc.csv --strategy candle_pulse
 - [ ] Verify the final report reconciles trade rows, equity rows, costs, counts, and ending equity.
 - [ ] Remove only temporary smoke-test output.
 - [ ] Record the final GO/NO-GO decision and any external legal or hosting decision.
+
+## Current self-review handoff
+
+Phase 8 implementation is complete and ready for external adversarial audit. The current evidence is
+258 passing unittest tests, compile/diff checks, a fresh 52-file wheel inspection, and successful
+external installed-wheel validation with exactly three report files. Ruff, mypy, pytest, coverage,
+hosted CI, dependency/license review, and public package-name confirmation remain release gates; they
+must be completed before marking the checklist as public-release GO.
