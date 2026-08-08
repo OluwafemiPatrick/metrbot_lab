@@ -1,4 +1,4 @@
-"""Command-line entry point for the Phase 2 validation command."""
+"""Command-line entry point for validation and strategy-catalog commands."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import argparse
 from collections.abc import Sequence
 import sys
 
-from .data import load_csv
 from .errors import DataValidationError
+from .strategies import BUILTIN_REGISTRY
 
 
 INPUT_ERROR = 2
@@ -30,6 +30,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     validate.add_argument("--data", required=True, help="path to the OHLC CSV file")
+    commands.add_parser(
+        "list-strategies",
+        help="list built-in strategies without loading market data",
+        description="List the deterministic built-in strategies available to the package.",
+    )
     return parser
 
 
@@ -37,11 +42,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "list-strategies":
+        for descriptor in BUILTIN_REGISTRY.list():
+            print(f"{descriptor.name}: {descriptor.description}")
+        return 0
     if args.command != "validate":
         parser.print_help(sys.stderr)
         return INPUT_ERROR
 
     try:
+        from .data import load_csv
+
         dataset = load_csv(args.data)
     except DataValidationError as exc:
         print(_format_data_error(exc), file=sys.stderr)

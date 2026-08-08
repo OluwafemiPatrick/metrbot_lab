@@ -8,7 +8,6 @@ import math
 from ..domain.bars import Bar
 from ..domain.orders import OrderIntent
 from ..errors import ErrorCode, StrategyValidationError
-from .base import Strategy
 from .context import StrategyContext
 from .registry import register
 
