@@ -37,7 +37,14 @@ class MetricReport(SerializableRecord):
                         "metric values must be finite numbers or null",
                         field=name,
                     )
-                require_finite(value, name)
+                try:
+                    require_finite(value, name)
+                except Exception as exc:
+                    raise ReportingError(
+                        ErrorCode.REPORTING_ERROR,
+                        "metric values must be finite numbers or null",
+                        field=name,
+                    ) from exc
         if not isinstance(self.unavailable_reasons, Mapping):
             raise ReportingError(
                 ErrorCode.REPORTING_ERROR,
