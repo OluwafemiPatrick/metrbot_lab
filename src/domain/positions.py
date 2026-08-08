@@ -47,9 +47,17 @@ class Position(SerializableRecord):
             return
 
         if not isinstance(self.position_id, str) or not self.position_id.strip():
-            raise DomainValidationError(ErrorCode.INVALID_STATE, "open positions require identifiers", field="position_id")
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "open positions require identifiers",
+                field="position_id",
+            )
         if not isinstance(self.symbol, str) or not self.symbol.strip():
-            raise DomainValidationError(ErrorCode.INVALID_STATE, "open positions require identifiers", field="position_id")
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "open positions require identifiers",
+                field="symbol",
+            )
         require_datetime(self.entry_timestamp, "entry_timestamp")
         require_positive(self.reference_entry_price, "reference_entry_price")
         require_positive(self.effective_entry_price, "effective_entry_price")

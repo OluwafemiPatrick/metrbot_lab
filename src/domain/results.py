@@ -6,7 +6,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from .base import SerializableRecord, require_datetime, require_finite, require_non_negative, require_positive, require_text
+from .base import (
+    SerializableRecord,
+    require_datetime,
+    require_finite,
+    require_non_negative,
+    require_positive,
+    require_text,
+)
 from .orders import OrderAction
 from ..errors import DomainValidationError, ErrorCode
 
@@ -59,7 +66,11 @@ class Fill(SerializableRecord):
             try:
                 action = OrderAction(action.upper())
             except ValueError as exc:
-                raise DomainValidationError(ErrorCode.INVALID_ACTION, "unsupported fill action", field="action") from exc
+                raise DomainValidationError(
+                    ErrorCode.INVALID_ACTION,
+                    "unsupported fill action",
+                    field="action",
+                ) from exc
             object.__setattr__(self, "action", action)
         elif not isinstance(action, OrderAction):
             raise DomainValidationError(ErrorCode.INVALID_ACTION, "unsupported fill action", field="action")
@@ -71,7 +82,11 @@ class Fill(SerializableRecord):
         require_finite(self.slippage_amount, "slippage_amount")
         require_non_negative(self.slippage_cost, "slippage_cost")
         require_non_negative(self.commission, "commission")
-        for field_name, value in (("strategy_tag", self.strategy_tag), ("reason", self.reason), ("position_id", self.position_id)):
+        for field_name, value in (
+            ("strategy_tag", self.strategy_tag),
+            ("reason", self.reason),
+            ("position_id", self.position_id),
+        ):
             if value is not None:
                 require_text(value, field_name)
 
@@ -134,7 +149,11 @@ class Trade(SerializableRecord):
             try:
                 reason = ExitReason(reason.upper())
             except ValueError as exc:
-                raise DomainValidationError(ErrorCode.INVALID_VALUE, "unsupported exit reason", field="exit_reason") from exc
+                raise DomainValidationError(
+                    ErrorCode.INVALID_VALUE,
+                    "unsupported exit reason",
+                    field="exit_reason",
+                ) from exc
             object.__setattr__(self, "exit_reason", reason)
         elif not isinstance(reason, ExitReason):
             raise DomainValidationError(ErrorCode.INVALID_VALUE, "unsupported exit reason", field="exit_reason")
@@ -236,10 +255,24 @@ class RunResult(SerializableRecord):
         if not isinstance(self.metadata, RunMetadata):
             raise DomainValidationError(ErrorCode.INVALID_STATE, "metadata must be RunMetadata", field="metadata")
         if not isinstance(self.trades, tuple) or not all(isinstance(item, Trade) for item in self.trades):
-            raise DomainValidationError(ErrorCode.INVALID_STATE, "trades must be a tuple of Trade records", field="trades")
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "trades must be a tuple of Trade records",
+                field="trades",
+            )
         if not isinstance(self.equity, tuple) or not all(isinstance(item, EquityPoint) for item in self.equity):
-            raise DomainValidationError(ErrorCode.INVALID_STATE, "equity must be a tuple of EquityPoint records", field="equity")
-        if not isinstance(self.warnings, tuple) or not all(isinstance(item, str) and item.strip() for item in self.warnings):
-            raise DomainValidationError(ErrorCode.INVALID_STATE, "warnings must be a tuple of non-empty strings", field="warnings")
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "equity must be a tuple of EquityPoint records",
+                field="equity",
+            )
+        if not isinstance(self.warnings, tuple) or not all(
+            isinstance(item, str) and item.strip() for item in self.warnings
+        ):
+            raise DomainValidationError(
+                ErrorCode.INVALID_STATE,
+                "warnings must be a tuple of non-empty strings",
+                field="warnings",
+            )
         if not isinstance(self.counts, RunCounts):
             raise DomainValidationError(ErrorCode.INVALID_STATE, "counts must be RunCounts", field="counts")

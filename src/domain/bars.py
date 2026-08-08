@@ -42,4 +42,8 @@ class Bar(SerializableRecord):
             require_non_negative(self.volume, "volume")
         if self.source_row is not None:
             if not isinstance(self.source_row, int) or isinstance(self.source_row, bool) or self.source_row < 1:
-                raise DomainValidationError(ErrorCode.INVALID_VALUE, "must be a positive row number", field="source_row")
+                raise DomainValidationError(
+                    ErrorCode.INVALID_VALUE,
+                    "must be a positive row number",
+                    field="source_row",
+                )

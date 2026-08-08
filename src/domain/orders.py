@@ -34,7 +34,11 @@ class OrderIntent(SerializableRecord):
             try:
                 action = OrderAction(action.upper())
             except ValueError as exc:
-                raise DomainValidationError(ErrorCode.INVALID_ACTION, "unsupported order action", field="action") from exc
+                raise DomainValidationError(
+                    ErrorCode.INVALID_ACTION,
+                    "unsupported order action",
+                    field="action",
+                ) from exc
             object.__setattr__(self, "action", action)
         elif not isinstance(action, OrderAction):
             raise DomainValidationError(ErrorCode.INVALID_ACTION, "unsupported order action", field="action")
