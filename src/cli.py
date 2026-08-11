@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 import sys
 
@@ -18,7 +19,12 @@ from .errors import (
     StrategyExecutionError,
     StrategyValidationError,
 )
-from .strategies import BUILTIN_REGISTRY
+from .strategies import (
+    BUILTIN_REGISTRY,
+    ProjectStrategyRegistry,
+    create_project_strategy,
+    remove_project_strategy,
+)
 
 
 INPUT_ERROR = 2
@@ -43,8 +49,29 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--data", required=True, help="path to the OHLC CSV file")
     commands.add_parser(
         "list-strategies",
-        help="list built-in strategies without loading market data",
-        description="List the deterministic built-in strategies available to the package.",
+        help="list built-in and project strategies without importing project code",
+        description="List built-in and project-local strategy aliases without importing project strategy code.",
+    )
+    create_strategy = commands.add_parser(
+        "create-strategy",
+        help="create and register a project-local strategy scaffold",
+        description=(
+            "Create a strategy package under strategies/ and add its alias to "
+            "strategies/registry.toml. Run this command from the project directory."
+        ),
+    )
+    create_strategy.add_argument("class_name", help="ASCII PascalCase class name, such as MyNewStrategy")
+    create_strategy.add_argument("--description", help="short description shown by list-strategies")
+    remove_strategy = commands.add_parser(
+        "remove-strategy",
+        help="unregister and remove a project-local strategy",
+        description="Remove a project alias and its generated directory. Built-in strategies are protected.",
+    )
+    remove_strategy.add_argument("name", help="lowercase project strategy alias, such as my_new_strategy")
+    remove_strategy.add_argument(
+        "--keep-files",
+        action="store_true",
+        help="remove only the registry record and preserve the strategy directory",
     )
     backtest = commands.add_parser(
         "backtest",
@@ -57,7 +84,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_optional_argument(backtest, "--config", help="path to a strict TOML configuration file")
     _add_optional_argument(backtest, "--data", help="path to the OHLC CSV input")
-    _add_optional_argument(backtest, "--strategy", help="built-in strategy name or module:ClassName")
+    _add_optional_argument(
+        backtest,
+        "--strategy",
+        help="built-in name, project alias, or module:ClassName",
+    )
     _add_optional_argument(backtest, "--initial-cash", type=float, help="starting account cash")
     _add_optional_argument(backtest, "--default-quantity", type=float, help="default order quantity")
     _add_optional_argument(backtest, "--commission-bps", type=float, help="commission in basis points")
@@ -80,12 +111,51 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "list-strategies":
-        for descriptor in BUILTIN_REGISTRY.list():
-            print(f"{descriptor.name}: {descriptor.description}")
+        try:
+            for descriptor in BUILTIN_REGISTRY.list():
+                print(f"{descriptor.name} [built-in]: {descriptor.description}")
+            for record in ProjectStrategyRegistry().list():
+                print(f"{record.name} [project]: {record.description}")
+        except StrategyValidationError as exc:
+            print(_format_cli_error(exc), file=sys.stderr)
+            return INPUT_ERROR
+        except Exception:
+            print("[INTERNAL_ERROR] strategies could not be listed", file=sys.stderr)
+            return INTERNAL_ERROR
+        return 0
+    if args.command == "create-strategy":
+        try:
+            record = create_project_strategy(args.class_name, description=args.description)
+        except StrategyValidationError as exc:
+            print(_format_cli_error(exc), file=sys.stderr)
+            return INPUT_ERROR
+        except Exception:
+            print("[INTERNAL_ERROR] strategy could not be created", file=sys.stderr)
+            return INTERNAL_ERROR
+        print(f"Created strategy: {record.name}")
+        print(f"Class: {record.class_name}")
+        print(f"Path: {record.directory}")
+        print("Registry: strategies/registry.toml")
+        print(f"Run with: metrbot-lab backtest --data <ohlc.csv> --strategy {record.name}")
+        return 0
+    if args.command == "remove-strategy":
+        try:
+            record = remove_project_strategy(args.name, keep_files=args.keep_files)
+        except StrategyValidationError as exc:
+            print(_format_cli_error(exc), file=sys.stderr)
+            return INPUT_ERROR
+        except Exception:
+            print("[INTERNAL_ERROR] strategy could not be removed", file=sys.stderr)
+            return INTERNAL_ERROR
+        print(f"Removed strategy registration: {record.name}")
+        if args.keep_files:
+            print(f"Files preserved: {record.directory}")
+        else:
+            print(f"Files removed: {record.directory}")
         return 0
     if args.command == "backtest":
         try:
-            config = _resolve_backtest_config(args)
+            config = _resolve_project_strategy_config(_resolve_backtest_config(args))
             from .engine import BacktestRunner
             from .reporting import calculate_metrics, write_artifacts
             from .reporting.terminal import format_terminal_summary
@@ -191,6 +261,21 @@ def _resolve_backtest_config(args: argparse.Namespace) -> RunConfig:
         "risk": {"max_position_quantity": 1.0, "max_drawdown_pct": None},
     }
     return config_from_mapping(apply_overrides(raw, overrides), source="<command line>")
+
+
+def _resolve_project_strategy_config(config: RunConfig) -> RunConfig:
+    """Resolve a project alias to its canonical import reference without importing it."""
+    if ":" in config.strategy:
+        return config
+    if any(descriptor.name == config.strategy for descriptor in BUILTIN_REGISTRY.list()):
+        return config
+    try:
+        record = ProjectStrategyRegistry().resolve(config.strategy)
+    except StrategyValidationError as exc:
+        if exc.code in {ErrorCode.UNKNOWN_STRATEGY, ErrorCode.INVALID_STRATEGY_NAME}:
+            return config
+        raise
+    return replace(config, strategy=record.reference)
 
 
 def _explicit_backtest_overrides(args: argparse.Namespace) -> dict[str, object]:

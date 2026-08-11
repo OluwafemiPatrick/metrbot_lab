@@ -4,9 +4,11 @@ from importlib import import_module
 from typing import Any
 
 from .base import Strategy, StrategyFactory, is_strategy, require_strategy, validate_strategy_result
+from .builtins.candle_pulse import CandlePulseStrategy
 from .context import StrategyContext, freeze_parameters
+from .project_registry import ProjectStrategyRecord, ProjectStrategyRegistry
 from .registry import BUILTIN_REGISTRY, StrategyDescriptor, StrategyRegistry, register
-from .candle_pulse import CandlePulseStrategy
+from .scaffold import class_name_to_project_name, create_project_strategy, remove_project_strategy
 
 
 _LAZY_EXPORTS = {
@@ -30,6 +32,7 @@ def __getattr__(name: str) -> Any:
     globals()[name] = value
     return value
 
+
 __all__ = [
     "Strategy",
     "StrategyFactory",
@@ -45,6 +48,11 @@ __all__ = [
     "BUILTIN_REGISTRY",
     "StrategyDescriptor",
     "StrategyRegistry",
+    "ProjectStrategyRecord",
+    "ProjectStrategyRegistry",
+    "class_name_to_project_name",
+    "create_project_strategy",
+    "remove_project_strategy",
     "register",
     "load_custom_strategy",
     "load_strategy",

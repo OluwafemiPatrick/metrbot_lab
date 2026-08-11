@@ -27,8 +27,8 @@ dev = [
 version = {attr = "metrbot_lab.version.__version__"}
 
 [tool.setuptools]
-package-dir = {metrbot_lab = "src", "metrbot_lab.domain" = "src/domain", "metrbot_lab.data" = "src/data", "metrbot_lab.execution" = "src/execution", "metrbot_lab.strategies" = "src/strategies", "metrbot_lab.config" = "src/config", "metrbot_lab.risk" = "src/risk", "metrbot_lab.engine" = "src/engine", "metrbot_lab.reporting" = "src/reporting"}
-packages = ["metrbot_lab", "metrbot_lab.domain", "metrbot_lab.data", "metrbot_lab.execution", "metrbot_lab.strategies", "metrbot_lab.config", "metrbot_lab.risk", "metrbot_lab.engine", "metrbot_lab.reporting"]
+package-dir = {metrbot_lab = "src", "metrbot_lab.domain" = "src/domain", "metrbot_lab.data" = "src/data", "metrbot_lab.execution" = "src/execution", "metrbot_lab.strategies" = "src/strategies", "metrbot_lab.strategies.builtins" = "src/strategies/builtins", "metrbot_lab.strategies.builtins.candle_pulse" = "src/strategies/builtins/candle_pulse", "metrbot_lab.config" = "src/config", "metrbot_lab.risk" = "src/risk", "metrbot_lab.engine" = "src/engine", "metrbot_lab.reporting" = "src/reporting"}
+packages = ["metrbot_lab", "metrbot_lab.domain", "metrbot_lab.data", "metrbot_lab.execution", "metrbot_lab.strategies", "metrbot_lab.strategies.builtins", "metrbot_lab.strategies.builtins.candle_pulse", "metrbot_lab.config", "metrbot_lab.risk", "metrbot_lab.engine", "metrbot_lab.reporting"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["*.pyc", "__pycache__/*"]

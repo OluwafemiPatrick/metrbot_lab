@@ -47,26 +47,49 @@ The MVP supports one signed net position: flat, long, or short. Use `BUY` and `S
 limit/stop-entry orders are not supported. Stop-loss and take-profit levels may be supplied on an
 entry intent.
 
-## Loading a strategy
+## Create and manage a strategy
 
-The built-in registry contains `candle_pulse`:
+Run the scaffold command from the repository or project directory:
 
 ```bash
+metrbot-lab create-strategy MyNewStrategy --description "My deterministic strategy."
 metrbot-lab list-strategies
 ```
 
-Run a custom class with a trusted `module.path:ClassName` reference:
+The command converts the PascalCase class name to the `my_new_strategy` alias and creates:
+
+```text
+strategies/
+├── __init__.py
+├── registry.toml
+└── my_new_strategy/
+    ├── __init__.py
+    └── strategy.py
+```
+
+Edit `strategies/my_new_strategy/strategy.py`, then run it by alias:
 
 ```bash
 metrbot-lab backtest \
   --data data/sample_ohlc.csv \
-  --strategy my_strategy:MyStrategy
+  --strategy my_new_strategy
 ```
 
-The class is loaded directly and does not mutate the built-in registry. Strategy parameters are
-provided through the TOML `[strategy]` table. See `examples/custom_strategy.py` for a small library
-example. A strategy constructor, callback exception, or invalid callback result fails the run; it is
-not silently interpreted as a no-op.
+Remove both the registry entry and strategy folder when it is no longer needed:
+
+```bash
+metrbot-lab remove-strategy my_new_strategy
+```
+
+Use `--keep-files` to unregister the alias without deleting its folder. Built-in strategies such as
+`candle_pulse` are immutable and cannot be overwritten or removed. The project registry is strict,
+versioned TOML maintained by these commands; do not edit it by hand.
+
+Advanced users may still run a trusted class directly with
+`--strategy my_strategy:MyStrategy`. Direct loading does not add an alias to the project registry.
+Strategy parameters are provided through the TOML `[strategy]` table. See
+`examples/custom_strategy.py` for a small library example. A constructor, callback exception, or
+invalid callback result fails the run; it is not silently interpreted as a no-op.
 
 Test custom strategies with small synthetic bars. Cover warm-up behavior, exact signal boundaries,
 long/short intents, protective levels, no-lookahead history, repeated decisions, and behavior while a

@@ -18,6 +18,18 @@ metrbot-lab backtest --data data/sample_ohlc.csv --strategy candle_pulse
 Use `--config configs/candle-pulse.toml` to load TOML configuration. Explicit CLI options override
 values loaded from the file.
 
+Create an editable project strategy scaffold, run it by its generated alias, and remove it with:
+
+```bash
+metrbot-lab create-strategy MyNewStrategy
+metrbot-lab backtest --data data/sample_ohlc.csv --strategy my_new_strategy
+metrbot-lab remove-strategy my_new_strategy
+```
+
+Each generated strategy has its own folder under `strategies/`. `--keep-files` unregisters an alias
+without deleting that folder. Built-in strategies cannot be overwritten or removed. See the
+[strategy guide](STRATEGY_GUIDE.md) for the callback contract and direct class loading.
+
 ## Run with Docker
 
 Docker is an optional installation path for users who do not want to install Python on the host.
@@ -49,6 +61,11 @@ docker run --rm \
   metrbot-lab:local backtest \
   --data data/sample_ohlc.csv \
   --strategy candle_pulse
+
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" \
+  metrbot-lab:local create-strategy MyNewStrategy
 ```
 
 Docker Desktop users may omit `--user` if host-user mapping is unavailable. The image contains only
