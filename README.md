@@ -12,10 +12,19 @@ metrbot-lab list-strategies
 metrbot-lab backtest --data data/sample_ohlc.csv --strategy candle_pulse
 ```
 
+Python does not need to be installed on the host when Docker is available:
+
+```bash
+docker build -t metrbot-lab:local .
+docker run --rm metrbot-lab:local list-strategies
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace" \
+  metrbot-lab:local validate --data data/sample_ohlc.csv
+```
+
 Successful runs print a terminal summary and create exactly `summary.json`, `trades.csv`, and
 `equity.csv` under `backtests/`. Use `--config configs/candle-pulse.toml`; explicit CLI options
 override TOML values. Read the [user guide](USER_GUIDE.md) for data, configuration, risk, execution,
-and reporting contracts, or the [strategy guide](STRATEGY_GUIDE.md) to add a custom strategy.
+reporting, and Docker usage, or the [strategy guide](STRATEGY_GUIDE.md) to add a custom strategy.
 
 Numerical results use binary floating-point arithmetic. Aggregate sums use `math.fsum`, and
 reconciliation comparisons use `1e-9` relative and absolute tolerances.

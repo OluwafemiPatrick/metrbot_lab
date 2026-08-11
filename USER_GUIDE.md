@@ -18,6 +18,44 @@ metrbot-lab backtest --data data/sample_ohlc.csv --strategy candle_pulse
 Use `--config configs/candle-pulse.toml` to load TOML configuration. Explicit CLI options override
 values loaded from the file.
 
+## Run with Docker
+
+Docker is an optional installation path for users who do not want to install Python on the host.
+Build the local image from the repository root:
+
+```bash
+docker build -t metrbot-lab:local .
+```
+
+Commands are passed directly to the `metrbot-lab` entry point:
+
+```bash
+docker run --rm metrbot-lab:local list-strategies
+```
+
+Mount the working directory at `/workspace` when a command needs input files or must preserve its
+three report artifacts. On Linux and macOS, mapping the host user prevents container-created files
+from being owned by another user:
+
+```bash
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" \
+  metrbot-lab:local validate --data data/sample_ohlc.csv
+
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/workspace" \
+  metrbot-lab:local backtest \
+  --data data/sample_ohlc.csv \
+  --strategy candle_pulse
+```
+
+Docker Desktop users may omit `--user` if host-user mapping is unavailable. The image contains only
+the installed application; datasets, configuration, custom strategies, and generated reports remain
+in the mounted directory. The container runs without root privileges by default and has no database,
+broker, or network service.
+
 ## OHLC data contract
 
 The minimum CSV header is:

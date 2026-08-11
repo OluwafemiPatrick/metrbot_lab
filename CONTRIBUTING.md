@@ -26,6 +26,8 @@ Run the public source checks available in your environment:
 .venv/bin/python -m compileall -q src scripts
 .venv/bin/python scripts/check_diff.py
 .venv/bin/python -m pip wheel . --no-deps --no-build-isolation --wheel-dir dist
+docker build -t metrbot-lab:local .
+docker run --rm metrbot-lab:local --help
 ```
 
 If an optional tool is unavailable, report that fact. Maintainers run the internal unit, contract,
@@ -57,6 +59,7 @@ Before creating a GitHub release, maintainers must:
 - run the complete internal validation suite and meet the configured coverage threshold;
 - pass formatting, linting, strict typing, compilation, and diff checks;
 - build and inspect the wheel from a clean checkout;
+- build the Docker image and smoke-test its CLI as the default non-root user;
 - run `validate`, `list-strategies`, and `backtest` from an external environment;
 - verify that successful runs create exactly the three documented report files;
 - confirm that invalid input and failed runs do not create successful artifacts;

@@ -9,7 +9,8 @@ orders.
 Custom strategies are imported and executed in the same Python process as the caller. This is a
 deliberate MVP contract, not a sandbox. A strategy can technically access the machine with the
 caller’s permissions, so users must run only code they trust and should use an isolated environment
-for untrusted experiments.
+for untrusted experiments. The same rule applies inside Docker: a strategy can access any host path
+mounted into its container.
 
 ## Reporting a vulnerability
 
