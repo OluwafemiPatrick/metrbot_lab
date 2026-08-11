@@ -70,4 +70,4 @@ not silently interpreted as a no-op.
 
 Test custom strategies with small synthetic bars. Cover warm-up behavior, exact signal boundaries,
 long/short intents, protective levels, no-lookahead history, repeated decisions, and behavior while a
-position is open. Do not use live market data or proprietary Metrbot logic in tests.
+position is open.

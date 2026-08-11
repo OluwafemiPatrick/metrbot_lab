@@ -14,13 +14,12 @@ metrbot-lab backtest --data data/sample_ohlc.csv --strategy candle_pulse
 
 Successful runs print a terminal summary and create exactly `summary.json`, `trades.csv`, and
 `equity.csv` under `backtests/`. Use `--config configs/candle-pulse.toml`; explicit CLI options
-override TOML values. Read [DATA_GUIDE.md](DATA_GUIDE.md), [STRATEGY_GUIDE.md](STRATEGY_GUIDE.md),
-[CONFIGURATION_AND_RISK.md](CONFIGURATION_AND_RISK.md), and
-[EXECUTION_AND_REPORTING.md](EXECUTION_AND_REPORTING.md) for the public contracts.
+override TOML values. Read the [user guide](USER_GUIDE.md) for data, configuration, risk, execution,
+and reporting contracts, or the [strategy guide](STRATEGY_GUIDE.md) to add a custom strategy.
 
 Numerical results use binary floating-point arithmetic. Aggregate sums use `math.fsum`, and
 reconciliation comparisons use `1e-9` relative and absolute tolerances.
 
 Exit codes are `0` for completion, `1` for strategy/internal failure, and `2` for invalid input,
-configuration, or strategy selection. This MVP has no live broker, database, web/GUI, downloader,
-calendar logic, or proprietary Metrbot code.
+configuration, or strategy selection. This MVP has no live broker, database, web/GUI, downloader, or
+calendar logic.

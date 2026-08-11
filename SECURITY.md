@@ -19,10 +19,11 @@ vulnerability-reporting or security-advisory channel. Otherwise, contact the pro
 through the private channel associated with the project host.
 
 Include the affected version or commit, a minimal reproduction using synthetic data, impact, and any
-safe mitigation. Do not include live broker credentials or proprietary Metrbot material.
+safe mitigation. Do not include credentials, private datasets, or other sensitive material.
 
 ## Supported release expectations
 
 Before a public release, maintainers must review dependencies and licenses, run a secret scan, inspect
-wheel contents, confirm the clean-room boundary, and verify that documentation does not imply live
-execution or future-performance guarantees. See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+wheel contents, review source provenance, and verify that documentation does not imply live execution
+or future-performance guarantees. The complete maintainer gate is recorded in
+[CONTRIBUTING.md](CONTRIBUTING.md#maintainer-release-checklist).
