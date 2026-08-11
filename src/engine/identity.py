@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
 import hashlib
 import importlib.util
 import json
-from pathlib import Path
 import platform
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
 
 from ..config import effective_configuration
 from ..domain.account import RunConfig, freeze_configuration_mapping
@@ -41,7 +41,9 @@ class RunIdentity(SerializableRecord):
             ("run_id", self.run_id),
         ):
             if not isinstance(value, str) or not value.strip():
-                raise RunIdentityError(ErrorCode.RUN_FINGERPRINT_ERROR, "identity field must be non-empty text", field=field_name)
+                raise RunIdentityError(
+                    ErrorCode.RUN_FINGERPRINT_ERROR, "identity field must be non-empty text", field=field_name
+                )
         if self.custom_strategy_sha256 is not None and (
             not isinstance(self.custom_strategy_sha256, str) or not self.custom_strategy_sha256.strip()
         ):

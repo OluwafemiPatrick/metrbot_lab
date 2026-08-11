@@ -5,9 +5,9 @@ from __future__ import annotations
 import math
 from datetime import datetime
 
-from ..domain.base import require_datetime, require_text
 from ..domain.account import AccountSnapshot
 from ..domain.bars import Bar
+from ..domain.base import require_datetime, require_text
 from ..domain.orders import OrderAction, OrderIntent
 from ..domain.positions import Position
 from ..domain.results import EquityPoint, ExitReason, Fill, Trade, TradeSide
@@ -18,8 +18,8 @@ from .costs import (
     calculate_fill_costs,
     calculate_gross_pnl,
     calculate_net_pnl,
-    calculate_return_pct,
     calculate_r_multiple,
+    calculate_return_pct,
     calculate_unrealized_pnl,
 )
 from .results import ExecutionResult
@@ -34,23 +34,23 @@ class Broker:
     """
 
     __slots__ = (
-        "_allocator",
         "_account",
         "_admissions",
+        "_allocator",
         "_cash",
         "_entry_fill",
         "_equity_points",
-        "_finalized",
         "_fills",
-        "_last_timestamp",
+        "_finalized",
         "_last_bar",
+        "_last_timestamp",
         "_ledger",
+        "_peak_equity",
         "_pending",
+        "_result",
         "_settings",
         "_symbol",
         "_trades",
-        "_peak_equity",
-        "_result",
     )
 
     def __init__(self, settings: ExecutionSettings, *, symbol: str = "UNSPECIFIED") -> None:

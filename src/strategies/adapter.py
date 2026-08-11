@@ -10,9 +10,8 @@ from ..domain.orders import OrderIntent
 from ..errors import ErrorCode, StrategyExecutionError, StrategyValidationError
 from ..execution.broker import Broker
 from ..execution.results import ExecutionResult
-from ..risk.contracts import RiskDecision, RiskPolicy
+from ..risk.contracts import RiskDecision, RiskPolicy, RiskReason
 from ..risk.results import RiskExecutionResult
-from ..risk.contracts import RiskReason
 from .base import Strategy, require_strategy, validate_strategy_result
 from .context import StrategyContext, freeze_parameters
 
@@ -20,7 +19,7 @@ from .context import StrategyContext, freeze_parameters
 class StrategyAdapter:
     """Drive one strategy through one existing broker session."""
 
-    __slots__ = ("_broker", "_parameters", "_strategy", "_has_run")
+    __slots__ = ("_broker", "_has_run", "_parameters", "_strategy")
 
     def __init__(self, strategy: Strategy, broker: Broker, parameters: Mapping[str, object] | None = None) -> None:
         if not isinstance(broker, Broker):
@@ -195,7 +194,7 @@ class RiskAwareStrategyAdapter(StrategyAdapter):
         """Return policy decisions made so far in stream order."""
         return tuple(self._risk_decisions)
 
-    def run(self, bars: Sequence[Bar]) -> RiskExecutionResult:
+    def run(self, bars: Sequence[Bar]) -> RiskExecutionResult:  # type: ignore[override]
         """Run one strategy session and retain separate risk and broker outcomes."""
         execution = self._run_session(bars, self._submit_risk_checked, self._risk_counts)
         return RiskExecutionResult(execution=execution, risk_decisions=tuple(self._risk_decisions))

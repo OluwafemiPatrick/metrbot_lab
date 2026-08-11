@@ -1,5 +1,6 @@
 """Public Phase 2 data-boundary contracts."""
 
+from .csv_loader import load_csv
 from .normalization import (
     CANONICAL_COLUMNS,
     OPTIONAL_COLUMNS,
@@ -7,15 +8,14 @@ from .normalization import (
     HeaderMap,
     normalize_headers,
 )
-from .csv_loader import load_csv
-from .validation import LoadedDataset, ValidationReport, ValidatedRows
+from .validation import LoadedDataset, ValidatedRows, ValidationReport
 
 __all__ = [
     "CANONICAL_COLUMNS",
-    "HeaderMap",
-    "LoadedDataset",
     "OPTIONAL_COLUMNS",
     "REQUIRED_COLUMNS",
+    "HeaderMap",
+    "LoadedDataset",
     "ValidatedRows",
     "ValidationReport",
     "load_csv",

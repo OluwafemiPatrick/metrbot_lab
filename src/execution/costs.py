@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 
 from ..domain.base import SerializableRecord, require_finite, require_non_negative, require_positive
 from ..domain.orders import OrderAction
@@ -173,7 +173,9 @@ def _require_actual_action(action: OrderAction | str) -> OrderAction:
         try:
             action = OrderAction(action.upper())
         except ValueError as exc:
-            raise DomainValidationError(ErrorCode.INVALID_ACTION, "unsupported execution action", field="action") from exc
+            raise DomainValidationError(
+                ErrorCode.INVALID_ACTION, "unsupported execution action", field="action"
+            ) from exc
     if action not in (OrderAction.BUY, OrderAction.SELL):
         raise DomainValidationError(
             ErrorCode.INVALID_ACTION,

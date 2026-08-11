@@ -5,8 +5,8 @@ from .runner import BacktestRunner
 from .terminal import format_terminal_summary
 
 __all__ = [
-    "RunIdentity",
     "BacktestRunner",
+    "RunIdentity",
     "build_run_identity",
     "canonical_json",
     "canonical_result_payload",

@@ -33,8 +33,7 @@ StrategyFactory: TypeAlias = Callable[[Mapping[str, object]], Strategy]
 def is_strategy(value: object) -> TypeGuard[Strategy]:
     """Return whether an object structurally exposes the strategy lifecycle."""
     return isinstance(value, Strategy) and all(
-        callable(getattr(value, callback_name, None))
-        for callback_name in ("on_start", "on_bar", "on_finish")
+        callable(getattr(value, callback_name, None)) for callback_name in ("on_start", "on_bar", "on_finish")
     )
 
 

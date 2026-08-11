@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from datetime import datetime
 
 from ..domain import Bar
 from ..domain.base import SerializableRecord, require_datetime, require_text
@@ -241,6 +241,7 @@ def validate_rows(
     awareness_mode: bool | None = None
 
     for offset, raw_row in enumerate(rows):
+        row: Sequence[str]
         if isinstance(raw_row, _NumberedRow):
             row = raw_row.values
             source_row = raw_row.source_row
@@ -369,8 +370,10 @@ def validate_rows(
 
 
 def _require_string_tuple(value: tuple[str, ...], field: str, *, allow_empty: bool = False) -> None:
-    if not isinstance(value, tuple) or (not allow_empty and not value) or not all(
-        isinstance(item, str) and item.strip() for item in value
+    if (
+        not isinstance(value, tuple)
+        or (not allow_empty and not value)
+        or not all(isinstance(item, str) and item.strip() for item in value)
     ):
         raise DomainValidationError(
             ErrorCode.INVALID_VALUE,

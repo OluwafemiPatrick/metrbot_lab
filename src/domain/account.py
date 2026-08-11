@@ -8,9 +8,8 @@ from datetime import date, datetime, time
 from types import MappingProxyType
 from typing import Final
 
-from .base import SerializableRecord, require_finite, require_non_negative, require_positive, require_text
 from ..errors import DomainValidationError, ErrorCode
-
+from .base import SerializableRecord, require_finite, require_non_negative, require_positive, require_text
 
 MAX_SLIPPAGE_BPS: Final[float] = 10_000.0
 
@@ -53,10 +52,7 @@ def _freeze_configuration_value(value: object, *, field_name: str, active: set[i
             )
         active.add(value_id)
         try:
-            return tuple(
-                _freeze_configuration_value(item, field_name=field_name, active=active)
-                for item in value
-            )
+            return tuple(_freeze_configuration_value(item, field_name=field_name, active=active) for item in value)
         finally:
             active.remove(value_id)
     if isinstance(value, (str, bool, int, float, type(None), date, datetime, time)):

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 import importlib
-from pathlib import Path
 import sys
+from collections.abc import Mapping
+from pathlib import Path
 
 from ..errors import ErrorCode, StrategyValidationError
 from .base import Strategy, require_strategy
@@ -96,7 +96,7 @@ def _construct(factory: object, parameters: Mapping[str, object] | None) -> Stra
         )
     frozen_parameters = freeze_parameters(parameters or {})
     try:
-        candidate = factory(frozen_parameters)  # type: ignore[operator]
+        candidate = factory(frozen_parameters)
     except Exception as exc:
         raise StrategyValidationError(
             ErrorCode.INVALID_STRATEGY,

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-import sys
+from typing import Any
 
 from .config import apply_overrides, config_from_mapping, load_toml_with_overrides
 from .domain import RunConfig
@@ -25,7 +26,6 @@ from .strategies import (
     create_project_strategy,
     remove_project_strategy,
 )
-
 
 INPUT_ERROR = 2
 INTERNAL_ERROR = 1
@@ -119,7 +119,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except StrategyValidationError as exc:
             print(_format_cli_error(exc), file=sys.stderr)
             return INPUT_ERROR
-        except Exception:
+        except Exception:  # noqa: BLE001 - CLI boundary must not expose unexpected tracebacks
             print("[INTERNAL_ERROR] strategies could not be listed", file=sys.stderr)
             return INTERNAL_ERROR
         return 0
@@ -129,7 +129,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except StrategyValidationError as exc:
             print(_format_cli_error(exc), file=sys.stderr)
             return INPUT_ERROR
-        except Exception:
+        except Exception:  # noqa: BLE001 - CLI boundary must not expose unexpected tracebacks
             print("[INTERNAL_ERROR] strategy could not be created", file=sys.stderr)
             return INTERNAL_ERROR
         print(f"Created strategy: {record.name}")
@@ -144,7 +144,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except StrategyValidationError as exc:
             print(_format_cli_error(exc), file=sys.stderr)
             return INPUT_ERROR
-        except Exception:
+        except Exception:  # noqa: BLE001 - CLI boundary must not expose unexpected tracebacks
             print("[INTERNAL_ERROR] strategy could not be removed", file=sys.stderr)
             return INTERNAL_ERROR
         print(f"Removed strategy registration: {record.name}")
@@ -172,7 +172,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except (ReportingError, StrategyExecutionError) as exc:
             print(_format_cli_error(exc), file=sys.stderr)
             return INTERNAL_ERROR
-        except Exception:
+        except Exception:  # noqa: BLE001 - CLI boundary must not expose unexpected tracebacks
             print("[INTERNAL_ERROR] backtest could not be completed", file=sys.stderr)
             return INTERNAL_ERROR
         if result.status != "SUCCESS":  # pragma: no cover - RunResult currently only returns completed success
@@ -197,7 +197,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except DataValidationError as exc:
         print(_format_data_error(exc), file=sys.stderr)
         return INPUT_ERROR
-    except Exception:
+    except Exception:  # noqa: BLE001 - CLI boundary must not expose unexpected tracebacks
         print("[INTERNAL_ERROR] validation could not be completed", file=sys.stderr)
         return INTERNAL_ERROR
 
@@ -291,11 +291,7 @@ def _explicit_backtest_overrides(args: argparse.Namespace) -> dict[str, object]:
         "max_position_quantity": "max_position_quantity",
         "max_drawdown_pct": "max_drawdown_pct",
     }
-    return {
-        target: getattr(args, source)
-        for source, target in mapping.items()
-        if hasattr(args, source)
-    }
+    return {target: getattr(args, source) for source, target in mapping.items() if hasattr(args, source)}
 
 
 def _resolve_backtest_input_path(args: argparse.Namespace, config: RunConfig) -> str:
@@ -308,7 +304,7 @@ def _resolve_backtest_input_path(args: argparse.Namespace, config: RunConfig) ->
     return str((Path(args.config).resolve().parent / configured_path).resolve())
 
 
-def _add_optional_argument(parser: argparse.ArgumentParser, *flags: str, **kwargs: object) -> None:
+def _add_optional_argument(parser: argparse.ArgumentParser, *flags: str, **kwargs: Any) -> None:
     kwargs["default"] = argparse.SUPPRESS
     parser.add_argument(*flags, **kwargs)
 

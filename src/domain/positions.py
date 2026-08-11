@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import cast
 
-from .base import SerializableRecord, require_datetime, require_finite, require_positive, require_text
 from ..errors import DomainValidationError, ErrorCode
+from .base import SerializableRecord, require_datetime, require_finite, require_positive, require_text
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,9 +59,9 @@ class Position(SerializableRecord):
                 "open positions require identifiers",
                 field="symbol",
             )
-        require_datetime(self.entry_timestamp, "entry_timestamp")
-        require_positive(self.reference_entry_price, "reference_entry_price")
-        require_positive(self.effective_entry_price, "effective_entry_price")
+        require_datetime(cast(datetime, self.entry_timestamp), "entry_timestamp")
+        require_positive(cast(float, self.reference_entry_price), "reference_entry_price")
+        require_positive(cast(float, self.effective_entry_price), "effective_entry_price")
         for field_name, value in (("stop_loss", self.stop_loss), ("take_profit", self.take_profit)):
             if value is not None:
                 require_positive(value, field_name)
@@ -68,7 +69,7 @@ class Position(SerializableRecord):
             require_text(self.strategy_tag, "strategy_tag")
 
     @classmethod
-    def flat(cls) -> "Position":
+    def flat(cls) -> Position:
         """Return the canonical flat position."""
         return cls()
 

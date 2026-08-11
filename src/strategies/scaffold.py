@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import shutil
 import tempfile
 import uuid
+from pathlib import Path
 
 from ..errors import ErrorCode, StrategyValidationError
 from .project_registry import (
@@ -16,7 +16,6 @@ from .project_registry import (
     validate_strategy_class_name,
 )
 from .registry import BUILTIN_REGISTRY
-
 
 _FIRST_CAMEL_BOUNDARY = re.compile(r"(.)([A-Z][a-z]+)")
 _SECOND_CAMEL_BOUNDARY = re.compile(r"([a-z0-9])([A-Z])")
@@ -241,11 +240,7 @@ def _restore_staged_directory(staging: Path, target: Path) -> None:
 
 
 def _strategy_init_source(class_name: str) -> str:
-    return (
-        '"""Project strategy package."""\n\n'
-        f"from .strategy import {class_name}\n\n"
-        f'__all__ = ["{class_name}"]\n'
-    )
+    return f'"""Project strategy package."""\n\nfrom .strategy import {class_name}\n\n__all__ = ["{class_name}"]\n'
 
 
 def _strategy_source(class_name: str) -> str:

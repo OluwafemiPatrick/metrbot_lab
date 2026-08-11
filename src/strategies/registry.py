@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
-import re
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from ..errors import ErrorCode, StrategyValidationError
-
 
 _NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*$", re.ASCII)
 RegisteredFactory = TypeVar("RegisteredFactory", bound=Callable[..., object])
@@ -123,7 +122,10 @@ def register(
     description: str,
 ) -> Callable[[RegisteredFactory], RegisteredFactory]:
     """Register a built-in strategy class or factory in the package registry."""
-    decorator = BUILTIN_REGISTRY.register(name, description=description)
+    decorator = cast(
+        Callable[[RegisteredFactory], RegisteredFactory],
+        BUILTIN_REGISTRY.register(name, description=description),
+    )
     if not callable(decorator):  # pragma: no cover - defensive typing guard
         raise StrategyValidationError(ErrorCode.INVALID_STRATEGY, "registry decorator could not be created")
-    return decorator  # type: ignore[return-value]
+    return decorator

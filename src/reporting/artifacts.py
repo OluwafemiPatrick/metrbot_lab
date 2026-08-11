@@ -3,22 +3,21 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Mapping
-from datetime import timezone
-from io import StringIO
 import json
 import math
 import os
-from pathlib import Path
 import shutil
 import tempfile
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from io import StringIO
+from pathlib import Path
 from typing import Final
 
 from ..domain.base import to_json_compatible
 from ..domain.results import RunResult, Trade
 from ..errors import ErrorCode, ReportingError
 from .contracts import ArtifactBundle, MetricReport, validate_metric_report, validate_report_input
-
 
 ARTIFACT_SCHEMA_VERSION: Final[int] = 1
 TRADE_COLUMNS: Final[tuple[str, ...]] = (
@@ -70,16 +69,17 @@ def build_summary_payload(result: RunResult, metrics: MetricReport) -> dict[str,
     """Build the stable summary mapping without writing to disk."""
     validate_report_input(result)
     validate_metric_report(result, metrics)
-    summary_metrics = dict(metrics.values)
+    summary_metrics: dict[str, object] = dict(metrics.values)
     summary_metrics["recovery"] = dict(metrics.recovery)
     summary_metrics["unavailable_reasons"] = dict(metrics.unavailable_reasons)
     configuration = _safe_configuration(result.effective_configuration)
     run_configuration = _section(configuration, "run")
-    execution_configuration = _section(configuration, "execution")
     risk_configuration = _section(configuration, "risk")
     strategy_name = result.metadata.strategy
     strategy_parameters = _section(configuration, "strategy")
     counts = _record_to_json(result.counts.to_dict())
+    if not isinstance(counts, dict):  # pragma: no cover - RunCounts serializes as an object
+        raise ReportingError(ErrorCode.REPORTING_ERROR, "run counts must serialize as an object")
     counts["pending_order_cancelled"] = result.pending_order_cancelled
     counts["unfilled_orders"] = int(result.pending_order_cancelled)
     return {
@@ -121,13 +121,16 @@ def serialize_summary_json(result: RunResult, metrics: MetricReport) -> str:
     """Serialize the summary with finite-number enforcement and a stable newline."""
     payload = build_summary_payload(result, metrics)
     try:
-        return json.dumps(
-            _record_to_json(payload),
-            allow_nan=False,
-            ensure_ascii=False,
-            indent=2,
-            sort_keys=True,
-        ) + "\n"
+        return (
+            json.dumps(
+                _record_to_json(payload),
+                allow_nan=False,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        )
     except (TypeError, ValueError) as exc:
         raise ReportingError(
             ErrorCode.REPORTING_ERROR,
@@ -236,9 +239,9 @@ def write_artifacts(
 def _next_destination(root: Path, result: RunResult) -> Path:
     created_at = result.metadata.created_at
     if created_at.tzinfo is None:
-        created_at = created_at.replace(tzinfo=timezone.utc)
+        created_at = created_at.replace(tzinfo=UTC)
     else:
-        created_at = created_at.astimezone(timezone.utc)
+        created_at = created_at.astimezone(UTC)
     short_id = result.metadata.run_id.removeprefix("run-")[:12] or "run"
     base = f"{created_at:%Y%m%d-%H%M%S}-{short_id}"
     candidate = root / base
@@ -318,6 +321,8 @@ def _safe_configuration(value: Mapping[str, object]) -> dict[str, object]:
     if not isinstance(raw, dict):  # pragma: no cover - effective configuration is always a mapping
         raise ReportingError(ErrorCode.REPORTING_ERROR, "effective configuration must be an object")
     safe = _redact_sensitive_values(raw)
+    if not isinstance(safe, dict):  # pragma: no cover - redaction preserves dictionary shape
+        raise ReportingError(ErrorCode.REPORTING_ERROR, "effective configuration must remain an object")
     run = safe.get("run")
     if isinstance(run, dict):
         data_path = run.get("data_path")
@@ -353,4 +358,8 @@ def _strategy_descriptor(name: str) -> str:
 
 
 def _timestamp(value: object) -> str | None:
-    return value.isoformat() if value is not None else None  # type: ignore[union-attr]
+    if value is None:
+        return None
+    if not isinstance(value, datetime):
+        raise ReportingError(ErrorCode.REPORTING_ERROR, "report timestamp must be a datetime")
+    return value.isoformat()

@@ -34,10 +34,7 @@ def format_terminal_summary(
         f"Win rate: {_metric_value(report, 'win_rate')}",
         f"Expectancy: {_metric_value(report, 'expectancy_per_trade')}",
         f"Profit factor: {_metric_value(report, 'profit_factor')}",
-        (
-            "Max drawdown: "
-            f"{_number(values['max_drawdown_amount'])} ({_number(values['max_drawdown_pct'])}%)"
-        ),
+        (f"Max drawdown: {_number(values['max_drawdown_amount'])} ({_number(values['max_drawdown_pct'])}%)"),
         f"Max drawdown duration: {values['max_drawdown_duration_bars']} bars",
         f"Drawdown recovery: {_recovery_value(report)}",
         f"Commission: {_number(values['total_commission'])}",

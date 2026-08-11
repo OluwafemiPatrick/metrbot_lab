@@ -1,5 +1,6 @@
 """Deterministic simulated execution contracts for Phase 3."""
 
+from .broker import Broker
 from .contracts import ExecutionReason, ExecutionSettings, IdentifierAllocator, OrderAdmission
 from .costs import (
     CostBreakdown,
@@ -11,19 +12,18 @@ from .costs import (
     calculate_return_pct,
     calculate_unrealized_pnl,
 )
-from .broker import Broker
 from .results import ExecutionResult
 from .state import BarExecution, PendingOrder, PositionLedger
 
 __all__ = [
+    "BarExecution",
+    "Broker",
     "CostBreakdown",
     "ExecutionReason",
+    "ExecutionResult",
     "ExecutionSettings",
     "IdentifierAllocator",
     "OrderAdmission",
-    "Broker",
-    "BarExecution",
-    "ExecutionResult",
     "PendingOrder",
     "PositionLedger",
     "calculate_fill_costs",

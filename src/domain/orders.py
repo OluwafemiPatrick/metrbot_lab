@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from .base import SerializableRecord, require_non_negative, require_positive, require_text
 from ..errors import DomainValidationError, ErrorCode
+from .base import SerializableRecord, require_positive, require_text
 
 
 class OrderAction(StrEnum):
@@ -48,9 +48,9 @@ class OrderIntent(SerializableRecord):
         for field_name, value in (("stop_loss", self.stop_loss), ("take_profit", self.take_profit)):
             if value is not None:
                 require_positive(value, field_name)
-        for field_name, value in (("tag", self.tag), ("reason", self.reason)):
-            if value is not None:
-                require_text(value, field_name)
+        for field_name, text_value in (("tag", self.tag), ("reason", self.reason)):
+            if text_value is not None:
+                require_text(text_value, field_name)
 
         if action is OrderAction.CLOSE and any(
             value is not None for value in (self.quantity, self.stop_loss, self.take_profit)

@@ -8,6 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Final
 
+from ..errors import DomainValidationError, ErrorCode
 from .account import AccountSnapshot, freeze_configuration_mapping
 from .base import (
     SerializableRecord,
@@ -19,8 +20,6 @@ from .base import (
 )
 from .orders import OrderAction
 from .positions import Position
-from ..errors import DomainValidationError, ErrorCode
-
 
 _EMPTY_TEXT: Final[str] = ""
 
@@ -168,9 +167,9 @@ class Trade(SerializableRecord):
             object.__setattr__(self, "exit_reason", reason)
         elif not isinstance(reason, ExitReason):
             raise DomainValidationError(ErrorCode.INVALID_VALUE, "unsupported exit reason", field="exit_reason")
-        for field_name, value in (("strategy_tag", self.strategy_tag), ("entry_reason", self.entry_reason)):
-            if value is not None:
-                require_text(value, field_name)
+        for field_name, text_value in (("strategy_tag", self.strategy_tag), ("entry_reason", self.entry_reason)):
+            if text_value is not None:
+                require_text(text_value, field_name)
 
 
 @dataclass(frozen=True, slots=True)

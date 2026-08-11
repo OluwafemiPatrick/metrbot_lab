@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import fields, is_dataclass
-from datetime import date, datetime, time
-from enum import Enum
 import json
 import math
 from collections.abc import Mapping, Sequence
+from dataclasses import fields, is_dataclass
+from datetime import date, datetime, time
+from enum import Enum
 from typing import Any
 
 from ..errors import DomainValidationError, ErrorCode, SerializationError
@@ -52,10 +52,7 @@ def to_json_compatible(value: Any, *, field: str | None = None) -> Any:
     if isinstance(value, (date, time)):
         return value.isoformat()
     if is_dataclass(value):
-        return {
-            item.name: to_json_compatible(getattr(value, item.name), field=item.name)
-            for item in fields(value)
-        }
+        return {item.name: to_json_compatible(getattr(value, item.name), field=item.name) for item in fields(value)}
     if isinstance(value, Mapping):
         if any(not isinstance(key, str) for key in value):
             raise SerializationError(

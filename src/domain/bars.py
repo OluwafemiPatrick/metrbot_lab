@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from .base import SerializableRecord, require_datetime, require_finite, require_non_negative, require_positive
 from ..errors import DomainValidationError, ErrorCode
+from .base import SerializableRecord, require_datetime, require_non_negative, require_positive
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,10 +40,11 @@ class Bar(SerializableRecord):
             raise DomainValidationError(ErrorCode.INVALID_VALUE, "high must not be below low", field="high")
         if self.volume is not None:
             require_non_negative(self.volume, "volume")
-        if self.source_row is not None:
-            if not isinstance(self.source_row, int) or isinstance(self.source_row, bool) or self.source_row < 1:
-                raise DomainValidationError(
-                    ErrorCode.INVALID_VALUE,
-                    "must be a positive row number",
-                    field="source_row",
-                )
+        if self.source_row is not None and (
+            not isinstance(self.source_row, int) or isinstance(self.source_row, bool) or self.source_row < 1
+        ):
+            raise DomainValidationError(
+                ErrorCode.INVALID_VALUE,
+                "must be a positive row number",
+                field="source_row",
+            )

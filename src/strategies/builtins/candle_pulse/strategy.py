@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 import math
+from collections.abc import Mapping
 
 from ....domain.bars import Bar
-from ....domain.orders import OrderIntent
+from ....domain.orders import OrderAction, OrderIntent
 from ....errors import ErrorCode, StrategyValidationError
 from ...context import StrategyContext
 from ...registry import register
-
 
 _DEFAULTS: dict[str, object] = {
     "lookback": 3,
@@ -98,7 +97,7 @@ class CandlePulseStrategy:
         lower_trigger = reference_close * (1.0 - self.threshold_pct / 100.0)
         if bar.close >= upper_trigger:
             return OrderIntent(
-                "BUY",
+                OrderAction.BUY,
                 quantity=self.quantity,
                 stop_loss=bar.close * (1.0 - self.stop_loss_pct / 100.0),
                 take_profit=bar.close * (1.0 + self.take_profit_pct / 100.0),
@@ -107,7 +106,7 @@ class CandlePulseStrategy:
             )
         if bar.close <= lower_trigger:
             return OrderIntent(
-                "SELL",
+                OrderAction.SELL,
                 quantity=self.quantity,
                 stop_loss=bar.close * (1.0 + self.stop_loss_pct / 100.0),
                 take_profit=bar.close * (1.0 - self.take_profit_pct / 100.0),

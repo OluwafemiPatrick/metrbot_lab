@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
 import json
 import os
-from pathlib import Path
 import re
 import tempfile
 import tomllib
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from pathlib import Path
 
 from ..errors import ErrorCode, StrategyValidationError
-
 
 PROJECT_REGISTRY_SCHEMA_VERSION = 1
 PROJECT_STRATEGIES_DIRECTORY = "strategies"
@@ -35,6 +34,7 @@ class ProjectStrategyRecord:
     def __post_init__(self) -> None:
         validate_project_strategy_name(self.name)
         validate_strategy_class_name(self.class_name)
+        validate_strategy_description(self.description)
         expected_directory = f"{PROJECT_STRATEGIES_DIRECTORY}/{self.name}"
         expected_reference = f"{PROJECT_STRATEGIES_DIRECTORY}.{self.name}.strategy:{self.class_name}"
         if self.directory != expected_directory:
@@ -49,24 +49,22 @@ class ProjectStrategyRecord:
                 "project strategy reference does not match its name and class",
                 field="reference",
             )
-        if not isinstance(self.description, str) or not self.description.strip():
-            raise StrategyValidationError(
-                ErrorCode.INVALID_STRATEGY_REGISTRY,
-                "project strategy description must be non-empty text",
-                field="description",
-            )
 
     @classmethod
     def create(cls, name: str, class_name: str, *, description: str | None = None) -> ProjectStrategyRecord:
         """Construct the canonical record for one generated strategy."""
         validate_project_strategy_name(name)
         validate_strategy_class_name(class_name)
+        if description is None or description == "":
+            normalized_description = f"Project strategy {class_name}."
+        else:
+            normalized_description = validate_strategy_description(description).strip()
         return cls(
             name=name,
             class_name=class_name,
             reference=f"{PROJECT_STRATEGIES_DIRECTORY}.{name}.strategy:{class_name}",
             directory=f"{PROJECT_STRATEGIES_DIRECTORY}/{name}",
-            description=(description or f"Project strategy {class_name}.").strip(),
+            description=normalized_description,
         )
 
 
@@ -302,6 +300,25 @@ def validate_strategy_class_name(class_name: str) -> str:
     return class_name
 
 
+def validate_strategy_description(description: str) -> str:
+    """Validate and return non-empty UTF-8 strategy description text."""
+    if not isinstance(description, str) or not description.strip():
+        raise StrategyValidationError(
+            ErrorCode.INVALID_STRATEGY_REGISTRY,
+            "project strategy description must be non-empty text",
+            field="description",
+        )
+    try:
+        description.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise StrategyValidationError(
+            ErrorCode.INVALID_STRATEGY_REGISTRY,
+            "project strategy description must contain valid Unicode text",
+            field="description",
+        ) from exc
+    return description
+
+
 def serialize_project_registry(records: Iterable[ProjectStrategyRecord]) -> str:
     """Serialize records as deterministic strict TOML."""
     by_name: dict[str, ProjectStrategyRecord] = {}
@@ -326,13 +343,18 @@ def serialize_project_registry(records: Iterable[ProjectStrategyRecord]) -> str:
             (
                 "",
                 f"[strategies.{record.name}]",
-                f"class_name = {json.dumps(record.class_name)}",
-                f"reference = {json.dumps(record.reference)}",
-                f"directory = {json.dumps(record.directory)}",
-                f"description = {json.dumps(record.description)}",
+                f"class_name = {_serialize_toml_string(record.class_name)}",
+                f"reference = {_serialize_toml_string(record.reference)}",
+                f"directory = {_serialize_toml_string(record.directory)}",
+                f"description = {_serialize_toml_string(record.description)}",
             )
         )
     return "\n".join(lines) + "\n"
+
+
+def _serialize_toml_string(value: str) -> str:
+    """Encode one validated string using TOML-compatible JSON escapes and literal Unicode."""
+    return json.dumps(value, ensure_ascii=False)
 
 
 __all__ = [
@@ -344,4 +366,5 @@ __all__ = [
     "serialize_project_registry",
     "validate_project_strategy_name",
     "validate_strategy_class_name",
+    "validate_strategy_description",
 ]

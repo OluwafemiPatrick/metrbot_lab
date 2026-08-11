@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from itertools import pairwise
 from math import isclose
 from pathlib import Path
 from typing import Final
@@ -12,7 +13,6 @@ from ..domain.account import freeze_configuration_mapping
 from ..domain.base import SerializableRecord, require_finite, require_text, to_json_compatible
 from ..domain.results import RunResult, RunStatus
 from ..errors import ErrorCode, ReportingError
-
 
 _EMPTY_MAPPING: Final[Mapping[str, object]] = {}
 REQUIRED_METRIC_KEYS: Final[frozenset[str]] = frozenset(
@@ -225,7 +225,7 @@ def validate_report_input(result: RunResult) -> None:
     if not result.equity:
         raise ReportingError(ErrorCode.REPORTING_ERROR, "successful runs require an equity curve", field="equity")
     timestamps = tuple(point.timestamp for point in result.equity)
-    if any(later <= earlier for earlier, later in zip(timestamps, timestamps[1:])):
+    if any(later <= earlier for earlier, later in pairwise(timestamps)):
         raise ReportingError(ErrorCode.REPORTING_ERROR, "equity points must be strictly ordered", field="equity")
     if not isclose(
         result.equity[-1].equity,

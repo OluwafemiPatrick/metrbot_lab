@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ..data import LoadedDataset, load_csv
@@ -34,7 +34,7 @@ class BacktestRunner:
         session = build_risk_aware_session(config, symbol=symbol)
         risk_result = session.run(dataset.bars)
         if not isinstance(risk_result, RiskExecutionResult):  # pragma: no cover - session contract guard
-            raise RuntimeError("risk-aware session returned an invalid result")
+            raise TypeError("risk-aware session returned an invalid result")
         return self._build_result(config, dataset, identity, risk_result)
 
     @staticmethod
@@ -53,7 +53,7 @@ class BacktestRunner:
             schema_version=1,
             run_id=identity.run_id,
             engine_version=__version__,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             python_version=identity.python_version,
             run_fingerprint=identity.run_fingerprint,
             strategy=config.strategy,

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, Protocol
+from typing import Protocol
 
 from ..errors import DataValidationError, ErrorCode
 from .normalization import normalize_headers
@@ -62,7 +63,7 @@ def load_csv(path: str | Path) -> LoadedDataset:
             source=source,
         ) from exc
 
-    warnings = ()
+    warnings: tuple[str, ...] = ()
     if header_map.extra_columns:
         warnings = (f"ignored extra columns: {', '.join(header_map.extra_columns)}",)
     bars = validated.bars

@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 import math
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Never
 
 from ..domain.account import MAX_SLIPPAGE_BPS, RunConfig
 from ..domain.base import to_json_compatible
 from ..errors import ConfigurationValidationError, ErrorCode
 from .loader import config_from_mapping, read_toml_mapping
-
 
 _OVERRIDE_SECTIONS = {
     "data_path": "run",
@@ -145,7 +144,7 @@ def _validate_override(name: object, value: object) -> None:
         _raise_override(name, "must be greater than zero or None")
 
 
-def _raise_override(name: str, message: str) -> None:
+def _raise_override(name: str, message: str) -> Never:
     raise ConfigurationValidationError(ErrorCode.INVALID_CONFIGURATION_OVERRIDE, message, field=name)
 
 

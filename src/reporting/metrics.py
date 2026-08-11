@@ -10,7 +10,6 @@ from ..domain.results import EquityPoint, RunResult, Trade
 from ..errors import ErrorCode, ReportingError
 from .contracts import MetricReport, validate_report_input
 
-
 _REL_TOLERANCE: Final[float] = 1e-9
 _ABS_TOLERANCE: Final[float] = 1e-9
 
@@ -42,7 +41,7 @@ def calculate_metrics(result: RunResult) -> MetricReport:
     average_loss = _mean(trade.net_pnl for trade in losers)
     win_rate = _ratio(len(winners), len(trades))
     payoff_ratio = None
-    if average_win is not None and average_loss not in (None, 0):
+    if average_win is not None and average_loss is not None and average_loss != 0:
         payoff_ratio = average_win / abs(average_loss)
     expectancy = _mean(trade.net_pnl for trade in trades)
     profit_factor = gross_profit / gross_loss if gross_loss != 0 else None
@@ -182,7 +181,7 @@ def _drawdown_metrics(
             current_duration = 0
 
     if maximum_amount == 0:
-        recovery = {
+        recovery: dict[str, object] = {
             "recovered": None,
             "recovery_bars": None,
             "recovery_timestamp": None,
@@ -192,11 +191,7 @@ def _drawdown_metrics(
 
     prior_peak = equity[maximum_peak_index].equity
     recovery_index = next(
-        (
-            index
-            for index in range(maximum_trough_index + 1, len(equity))
-            if equity[index].equity >= prior_peak
-        ),
+        (index for index in range(maximum_trough_index + 1, len(equity)) if equity[index].equity >= prior_peak),
         None,
     )
     if recovery_index is None:

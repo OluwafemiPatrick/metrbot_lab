@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from datetime import date, datetime, time
-import math
 from typing import Any
 
 from ..errors import ConfigurationValidationError, ErrorCode
-
 
 ALLOWED_SECTIONS = frozenset({"run", "execution", "risk", "strategy", "metadata"})
 RUN_KEYS = frozenset({"data_path", "strategy", "initial_cash", "default_quantity", "allow_short"})

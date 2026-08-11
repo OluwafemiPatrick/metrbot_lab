@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ..domain.base import SerializableRecord, require_datetime, require_text
-from ..domain.results import EquityPoint, Fill, Trade
 from ..domain.orders import OrderIntent
 from ..domain.positions import Position
+from ..domain.results import EquityPoint, Fill, Trade
 from ..errors import DomainValidationError, ErrorCode
 
 
